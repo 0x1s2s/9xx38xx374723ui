@@ -1,0 +1,1584 @@
+local v0rtexdIsTheBestDev = cloneref or function(service) return service end
+
+local oMgThisTweenServiceIsSoCool = v0rtexdIsTheBestDev(game:GetService("TweenService"))
+local thisInputServiceGoesHard = v0rtexdIsTheBestDev(game:GetService("UserInputService"))
+local runServiceMoreLikeWalkService = v0rtexdIsTheBestDev(game:GetService("RunService"))
+local playersAreNoobs = v0rtexdIsTheBestDev(game:GetService("Players"))
+local textServiceBeLikeText = v0rtexdIsTheBestDev(game:GetService("TextService"))
+local coreGuiMoreLikeBoreGui = v0rtexdIsTheBestDev(game:GetService("CoreGui"))
+local guiServiceIsCool = v0rtexdIsTheBestDev(game:GetService("GuiService"))
+
+local superMegaAwesomeLibrary = {}
+superMegaAwesomeLibrary.__index = superMegaAwesomeLibrary
+
+local theOneAndOnlyPlayer = playersAreNoobs.LocalPlayer
+local mouseGoClickClick = theOneAndOnlyPlayer:GetMouse()
+
+local isMobileUserSadly = thisInputServiceGoesHard.TouchEnabled and not thisInputServiceGoesHard.KeyboardEnabled
+local mobileScaleFactor = isMobileUserSadly and 0.7 or 1
+
+local function makeThingExist(className, properties)
+    local whatWeJustMade = Instance.new(className)
+    for property, value in pairs(properties) do
+        if property ~= "Parent" then
+            pcall(function()
+                whatWeJustMade[property] = value
+            end)
+        end
+    end
+    if properties.Parent then
+        whatWeJustMade.Parent = properties.Parent
+    end
+    return whatWeJustMade
+end
+
+local function smoothMoveGoWoosh(instance, properties, duration, easingStyle, easingDirection)
+    local tweenInfoYay = TweenInfo.new(duration or 0.2, easingStyle or Enum.EasingStyle.Quad, easingDirection or Enum.EasingDirection.Out)
+    local tweenGoVroom = oMgThisTweenServiceIsSoCool:Create(instance, tweenInfoYay, properties)
+    tweenGoVroom:Play()
+    return tweenGoVroom
+end
+
+local function makeDraggableCuzWeCan(frame, handle)
+    local amIDragging = false
+    local whatAmIDragging
+    local whereDidIStart
+    local whereWasIBefore
+    
+    handle = handle or frame
+    
+    local function updatePositionYay(input)
+        local howMuchDidIMove = input.Position - whereDidIStart
+        frame.Position = UDim2.new(whereWasIBefore.X.Scale, whereWasIBefore.X.Offset + howMuchDidIMove.X, whereWasIBefore.Y.Scale, whereWasIBefore.Y.Offset + howMuchDidIMove.Y)
+    end
+    
+    handle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            amIDragging = true
+            whereDidIStart = input.Position
+            whereWasIBefore = frame.Position
+            
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    amIDragging = false
+                end
+            end)
+        end
+    end)
+    
+    handle.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            whatAmIDragging = input
+        end
+    end)
+    
+    thisInputServiceGoesHard.InputChanged:Connect(function(input)
+        if input == whatAmIDragging and amIDragging then
+            updatePositionYay(input)
+        end
+    end)
+end
+
+local function getPlayerAvatarCuzTheyreBeautiful(userId)
+    local didItWork, whatWeGot = pcall(function()
+        return playersAreNoobs:GetUserThumbnailAsync(userId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
+    end)
+    if didItWork then
+        return whatWeGot
+    end
+    return "rbxassetid://135756197673563"
+end
+
+local function howWideIsThisText(text, textSize, font)
+    local textBoundsYay = textServiceBeLikeText:GetTextSize(text, textSize, font or Enum.Font.GothamSemibold, Vector2.new(math.huge, math.huge))
+    return textBoundsYay.X
+end
+
+local function truncateTextLikeABoss(text, maxWidth, textSize, font)
+    local fullWidth = howWideIsThisText(text, textSize, font)
+    if fullWidth <= maxWidth then
+        return text
+    end
+    
+    local truncated = text
+    while howWideIsThisText(truncated .. "...", textSize, font) > maxWidth and #truncated > 0 do
+        truncated = truncated:sub(1, -2)
+    end
+    return truncated .. "..."
+end
+
+function superMegaAwesomeLibrary.new(config)
+    local self = setmetatable({}, superMegaAwesomeLibrary)
+    
+    self.config = config or {}
+    self.config.Name = self.config.Name or "o11 vision"
+    self.config.AccentColor = self.config.AccentColor or Color3.fromRGB(2, 133, 255)
+    self.config.BackgroundColor = self.config.BackgroundColor or Color3.fromRGB(16, 16, 16)
+    self.config.SecondaryColor = self.config.SecondaryColor or Color3.fromRGB(18, 18, 18)
+    self.config.TextColor = self.config.TextColor or Color3.fromRGB(255, 255, 255)
+    self.config.SubTextColor = self.config.SubTextColor or Color3.fromRGB(124, 124, 124)
+    
+    self.sectionsAreAwesome = {}
+    self.tabsGoWoosh = {}
+    self.currentTabYay = nil
+    self.notificationsAreCool = {}
+    self.isToggledOn = true
+    self.dropdownHolderRef = nil
+    self.toggleKeyCode = Enum.KeyCode.RightControl
+    
+    self:CreateUIBecauseWeNeedIt()
+    
+    return self
+end
+
+function superMegaAwesomeLibrary:CreateUIBecauseWeNeedIt()
+    self.screenGuiYay = makeThingExist("ScreenGui", {
+        Name = "v0rtexdBestUIEver",
+        ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+        ResetOnSpawn = false
+    })
+    
+    if syn then
+        syn.protect_gui(self.screenGuiYay)
+        self.screenGuiYay.Parent = coreGuiMoreLikeBoreGui
+    elseif gethui then
+        self.screenGuiYay.Parent = gethui()
+    else
+        self.screenGuiYay.Parent = theOneAndOnlyPlayer:WaitForChild("PlayerGui")
+    end
+    
+    self.dropdownHolderRef = makeThingExist("Frame", {
+        Name = "DropdownHolderBecauseDropdownsNeedHomes",
+        BackgroundTransparency = 1,
+        Size = UDim2.new(1, 0, 1, 0),
+        ZIndex = 9999,
+        Parent = self.screenGuiYay
+    })
+    
+    self:CreateWatermarkBecauseWeCool()
+    self:CreateMainFrameYay()
+    self:CreateNotificationHolderForCoolNotifs()
+    self:CreateMobileToggleButton()
+    
+    thisInputServiceGoesHard.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if input.KeyCode == self.toggleKeyCode then
+            self:ToggleUI()
+        end
+    end)
+end
+
+function superMegaAwesomeLibrary:ToggleUI()
+    self.isToggledOn = not self.isToggledOn
+    smoothMoveGoWoosh(self.mainFrameYay, {
+        Position = self.isToggledOn and UDim2.new(0.5, -376 * mobileScaleFactor, 0.5, -246 * mobileScaleFactor) or UDim2.new(0.5, -376 * mobileScaleFactor, 1.5, 0)
+    }, 0.3, Enum.EasingStyle.Back, self.isToggledOn and Enum.EasingDirection.Out or Enum.EasingDirection.In)
+end
+
+function superMegaAwesomeLibrary:SetToggleKey(keyCode)
+    self.toggleKeyCode = keyCode
+end
+
+function superMegaAwesomeLibrary:CreateMobileToggleButton()
+    local buttonSize = 48 * mobileScaleFactor
+    
+    self.mobileToggleFrame = makeThingExist("Frame", {
+        Name = "MobileToggleButton",
+        BackgroundColor3 = Color3.fromRGB(16, 16, 16),
+        Position = UDim2.new(0.5, -buttonSize/2, 0, 10),
+        BorderColor3 = Color3.new(),
+        BorderSizePixel = 0,
+        Size = UDim2.new(0, buttonSize, 0, buttonSize),
+        Parent = self.screenGuiYay
+    })
+    
+    makeThingExist("UICorner", {
+        CornerRadius = UDim.new(0, 10),
+        Parent = self.mobileToggleFrame
+    })
+    
+    local mobileStroke = makeThingExist("UIStroke", {
+        Color = Color3.fromRGB(40, 40, 40),
+        Thickness = 1.5,
+        Parent = self.mobileToggleFrame
+    })
+    
+    makeThingExist("UIGradient", {
+        Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.new(1, 1, 1)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(150, 150, 150)),
+            ColorSequenceKeypoint.new(1, Color3.new(1, 1, 1))
+        }),
+        Rotation = 45,
+        Parent = mobileStroke
+    })
+    
+    self.mobileToggleIcon = makeThingExist("ImageLabel", {
+        Name = "ToggleIcon",
+        BackgroundTransparency = 1,
+        Image = "rbxassetid://95109736896642",
+        ImageColor3 = self.config.AccentColor,
+        Position = UDim2.new(0.5, 0, 0.5, 0),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Size = UDim2.new(0, 28 * mobileScaleFactor, 0, 28 * mobileScaleFactor),
+        Parent = self.mobileToggleFrame
+    })
+    
+    local glowEffect = makeThingExist("ImageLabel", {
+        Name = "GlowEffect",
+        BackgroundTransparency = 1,
+        Image = "rbxassetid://5028857084",
+        ImageColor3 = self.config.AccentColor,
+        ImageTransparency = 0.7,
+        Position = UDim2.new(0.5, 0, 0.5, 0),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Size = UDim2.new(1.8, 0, 1.8, 0),
+        ZIndex = 0,
+        Parent = self.mobileToggleFrame
+    })
+    
+    local mobileToggleBtn = makeThingExist("TextButton", {
+        Name = "ClickButton",
+        Text = "",
+        BackgroundTransparency = 1,
+        Size = UDim2.new(1, 0, 1, 0),
+        Parent = self.mobileToggleFrame
+    })
+    
+    mobileToggleBtn.MouseButton1Click:Connect(function()
+        self:ToggleUI()
+        
+        smoothMoveGoWoosh(self.mobileToggleIcon, {Size = UDim2.new(0, 24 * mobileScaleFactor, 0, 24 * mobileScaleFactor)}, 0.1)
+        task.delay(0.1, function()
+            smoothMoveGoWoosh(self.mobileToggleIcon, {Size = UDim2.new(0, 28 * mobileScaleFactor, 0, 28 * mobileScaleFactor)}, 0.15, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+        end)
+    end)
+    
+    mobileToggleBtn.MouseEnter:Connect(function()
+        smoothMoveGoWoosh(self.mobileToggleFrame, {BackgroundColor3 = Color3.fromRGB(24, 24, 24)}, 0.2)
+        smoothMoveGoWoosh(glowEffect, {ImageTransparency = 0.5}, 0.2)
+    end)
+    
+    mobileToggleBtn.MouseLeave:Connect(function()
+        smoothMoveGoWoosh(self.mobileToggleFrame, {BackgroundColor3 = Color3.fromRGB(16, 16, 16)}, 0.2)
+        smoothMoveGoWoosh(glowEffect, {ImageTransparency = 0.7}, 0.2)
+    end)
+    
+    makeDraggableCuzWeCan(self.mobileToggleFrame)
+end
+
+function superMegaAwesomeLibrary:CreateWatermarkBecauseWeCool()
+    local hubNameWidth = howWideIsThisText(self.config.Name, 14, Enum.Font.GothamSemibold)
+    local initialText = self.config.Name .. ' | 00:00:00 | 60 FPS'
+    local initialWidth = howWideIsThisText(initialText, 14, Enum.Font.GothamSemibold) + 45
+    
+    self.watermarkFrame = makeThingExist('Frame', {
+        Name = 'WatermarkCuzWeNeedFlexing',
+        BackgroundColor3 = Color3.fromRGB(16, 16, 16),
+        Position = UDim2.new(0.01, 0, 0.02, 0),
+        BorderColor3 = Color3.new(),
+        BorderSizePixel = 0,
+        Size = UDim2.new(0, initialWidth * mobileScaleFactor, 0, 36 * mobileScaleFactor),
+        Parent = self.screenGuiYay
+    })
+    
+    makeThingExist('UICorner', {
+        Name = 'RoundedCornersAreSexy',
+        CornerRadius = UDim.new(0, 7),
+        Parent = self.watermarkFrame
+    })
+    
+    local watermarkIconYay = makeThingExist('ImageLabel', {
+        Name = 'IconGoesHere',
+        BorderColor3 = Color3.new(),
+        BackgroundColor3 = Color3.new(1, 1, 1),
+        Image = 'rbxassetid://10723375250',
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0, 11, 0.5, -7.5 * mobileScaleFactor),
+        BorderSizePixel = 0,
+        Size = UDim2.new(0, 15 * mobileScaleFactor, 0, 15 * mobileScaleFactor),
+        Parent = self.watermarkFrame
+    })
+    
+    makeThingExist('UIAspectRatioConstraint', {
+        Name = 'KeepItSquare',
+        Parent = watermarkIconYay
+    })
+    
+    self.watermarkTextLabel = makeThingExist('TextLabel', {
+        Name = 'TextGoesHereToo',
+        FontFace = Font.new('rbxasset://fonts/families/GothamSSm.json', Enum.FontWeight.SemiBold, Enum.FontStyle.Normal),
+        TextColor3 = Color3.new(1, 1, 1),
+        Text = initialText,
+        BackgroundColor3 = Color3.new(1, 1, 1),
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0, 32, 0, 0),
+        BorderSizePixel = 0,
+        BorderColor3 = Color3.new(),
+        TextSize = 14 * mobileScaleFactor,
+        Size = UDim2.new(1, -40, 1, 0),
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = self.watermarkFrame
+    })
+    
+    makeThingExist('UIPadding', {
+        Name = 'PaddingForDays',
+        PaddingTop = UDim.new(0, 2),
+        Parent = self.watermarkTextLabel
+    })
+    
+    makeDraggableCuzWeCan(self.watermarkFrame)
+    
+    task.spawn(function()
+        while task.wait(0.5) do
+            if self.watermarkFrame and self.watermarkFrame.Parent and self.watermarkTextLabel and self.watermarkTextLabel.Parent then
+                local timeNow = os.date('%H:%M:%S')
+                local fpsCount = math.floor(1 / runServiceMoreLikeWalkService.RenderStepped:Wait())
+                local newText = self.config.Name .. ' | ' .. timeNow .. ' | ' .. fpsCount .. ' FPS'
+                self.watermarkTextLabel.Text = newText
+                
+                local newWidth = howWideIsThisText(newText, 14 * mobileScaleFactor, Enum.Font.GothamSemibold) + 45
+                smoothMoveGoWoosh(self.watermarkFrame, {Size = UDim2.new(0, newWidth, 0, 36 * mobileScaleFactor)}, 0.2)
+            end
+        end
+    end)
+end
+
+function superMegaAwesomeLibrary:CreateWatermarkBecauseWeCool()
+    local hubNameWidth = howWideIsThisText(self.config.Name, 14, Enum.Font.GothamSemibold)
+    local initialText = self.config.Name .. " | 00:00:00 | 60 FPS"
+    local initialWidth = howWideIsThisText(initialText, 14, Enum.Font.GothamSemibold) + 45
+    
+    self.watermarkFrame = makeThingExist("Frame", {
+        Name = "WatermarkCuzWeNeedFlexing",
+        BackgroundColor3 = Color3.fromRGB(16, 16, 16),
+        Position = UDim2.new(0.01, 0, 0.02, 0),
+        BorderSizePixel = 0,
+        Size = UDim2.new(0, initialWidth * mobileScaleFactor, 0, 36 * mobileScaleFactor),
+        Parent = self.screenGuiYay
+    })
+    
+    makeThingExist("UICorner", {CornerRadius = UDim.new(0, 7), Parent = self.watermarkFrame})
+    
+    makeThingExist("ImageLabel", {
+        Image = "rbxassetid://10723375250", BackgroundTransparency = 1,
+        Position = UDim2.new(0, 11, 0.5, -7.5 * mobileScaleFactor),
+        Size = UDim2.new(0, 15 * mobileScaleFactor, 0, 15 * mobileScaleFactor),
+        Parent = self.watermarkFrame
+    })
+    
+    self.watermarkTextLabel = makeThingExist("TextLabel", {
+        FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
+        TextColor3 = Color3.new(1, 1, 1), Text = initialText, BackgroundTransparency = 1,
+        Position = UDim2.new(0, 32, 0, 0), TextSize = 14 * mobileScaleFactor,
+        Size = UDim2.new(1, -40, 1, 0), TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = self.watermarkFrame
+    })
+    
+    makeDraggableCuzWeCan(self.watermarkFrame)
+    
+    task.spawn(function()
+        while task.wait(0.5) do
+            if self.watermarkFrame and self.watermarkFrame.Parent then
+                local timeNow = os.date("%H:%M:%S")
+                local fpsCount = math.floor(1 / runServiceMoreLikeWalkService.RenderStepped:Wait())
+                local newText = self.config.Name .. " | " .. timeNow .. " | " .. fpsCount .. " FPS"
+                self.watermarkTextLabel.Text = newText
+                local newWidth = howWideIsThisText(newText, 14 * mobileScaleFactor, Enum.Font.GothamSemibold) + 45
+                smoothMoveGoWoosh(self.watermarkFrame, {Size = UDim2.new(0, newWidth, 0, 36 * mobileScaleFactor)}, 0.2)
+            end
+        end
+    end)
+end
+
+function superMegaAwesomeLibrary:CreateMainFrameYay()
+    local frameWidth = 753 * mobileScaleFactor
+    local frameHeight = 493 * mobileScaleFactor
+    
+    self.mainFrameYay = makeThingExist("Frame", {
+        Name = "MainFrameIsAwesome",
+        BackgroundColor3 = Color3.fromRGB(16, 16, 16),
+        Position = UDim2.new(0.5, -frameWidth/2, 0.5, -frameHeight/2),
+        BorderSizePixel = 0,
+        Size = UDim2.new(0, frameWidth, 0, frameHeight),
+        Parent = self.screenGuiYay
+    })
+    
+    makeThingExist("UICorner", {CornerRadius = UDim.new(0, 10), Parent = self.mainFrameYay})
+    
+    self.dragBarThing = makeThingExist("Frame", {
+        BackgroundTransparency = 1, Position = UDim2.new(0, 0, 0, 0),
+        Size = UDim2.new(1, 0, 0, 65 * mobileScaleFactor), Parent = self.mainFrameYay
+    })
+    
+    makeDraggableCuzWeCan(self.mainFrameYay, self.dragBarThing)
+    
+    local hubNameWidth = howWideIsThisText(self.config.Name, 17 * mobileScaleFactor, Enum.Font.GothamSemibold)
+    
+    self.hubNameLabel = makeThingExist("TextLabel", {
+        FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
+        TextColor3 = Color3.new(1, 1, 1), Text = self.config.Name, BackgroundTransparency = 1,
+        Position = UDim2.new(0, 10, 0, 14 * mobileScaleFactor), TextSize = 17 * mobileScaleFactor,
+        Size = UDim2.new(0, hubNameWidth + 10, 0, 20 * mobileScaleFactor),
+        TextXAlignment = Enum.TextXAlignment.Left, Parent = self.mainFrameYay
+    })
+    
+    local playerName = "@" .. theOneAndOnlyPlayer.Name
+    self.userNameLabel = makeThingExist("TextLabel", {
+        FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
+        TextColor3 = Color3.fromRGB(46, 46, 46), Text = playerName, BackgroundTransparency = 1,
+        Position = UDim2.new(0, 10, 0, 34 * mobileScaleFactor), TextSize = 14 * mobileScaleFactor,
+        Size = UDim2.new(0, 120 * mobileScaleFactor, 0, 18 * mobileScaleFactor),
+        TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd,
+        Parent = self.mainFrameYay
+    })
+    
+    self.playerAvatarImg = makeThingExist("ImageLabel", {
+        Image = getPlayerAvatarCuzTheyreBeautiful(theOneAndOnlyPlayer.UserId), BackgroundTransparency = 1,
+        Position = UDim2.new(0, 145 * mobileScaleFactor, 0, 17 * mobileScaleFactor),
+        Size = UDim2.new(0, 30 * mobileScaleFactor, 0, 30 * mobileScaleFactor), Parent = self.mainFrameYay
+    })
+    makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = self.playerAvatarImg})
+    
+    self.lineSeperator = makeThingExist("Frame", {
+        BackgroundColor3 = Color3.fromRGB(36, 36, 36),
+        Position = UDim2.new(0, 19, 0, 64 * mobileScaleFactor),
+        Size = UDim2.new(0, 156 * mobileScaleFactor, 0, 1), Parent = self.mainFrameYay
+    })
+    
+    self.tabNameLabel = makeThingExist("TextLabel", {
+        FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
+        TextColor3 = Color3.new(1, 1, 1), Text = "tab name", BackgroundTransparency = 1,
+        Position = UDim2.new(0, 201 * mobileScaleFactor, 0, 14 * mobileScaleFactor),
+        TextSize = 17 * mobileScaleFactor, Size = UDim2.new(0, 78, 0, 20 * mobileScaleFactor),
+        TextXAlignment = Enum.TextXAlignment.Left, Parent = self.mainFrameYay
+    })
+    
+    self.tabDescriptionLabel = makeThingExist("TextLabel", {
+        FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
+        TextColor3 = Color3.fromRGB(46, 46, 46), Text = "tab description", BackgroundTransparency = 1,
+        Position = UDim2.new(0, 201 * mobileScaleFactor, 0, 34 * mobileScaleFactor),
+        TextSize = 14 * mobileScaleFactor, Size = UDim2.new(0, 200, 0, 18 * mobileScaleFactor),
+        TextXAlignment = Enum.TextXAlignment.Left, Parent = self.mainFrameYay
+    })
+    
+    self.sectionHolderScroll = makeThingExist("ScrollingFrame", {
+        BackgroundTransparency = 1, Position = UDim2.new(0, 17, 0, 75 * mobileScaleFactor),
+        Size = UDim2.new(0, 162 * mobileScaleFactor, 0, 404 * mobileScaleFactor),
+        ScrollBarThickness = 0, CanvasSize = UDim2.new(0, 0, 0, 0),
+        AutomaticCanvasSize = Enum.AutomaticSize.Y, ClipsDescendants = false, Parent = self.mainFrameYay
+    })
+    
+    makeThingExist("UIPadding", {PaddingLeft = UDim.new(0, 2), PaddingRight = UDim.new(0, 2), PaddingTop = UDim.new(0, 2), Parent = self.sectionHolderScroll})
+    self.sectionLayoutThing = makeThingExist("UIListLayout", {Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder, Parent = self.sectionHolderScroll})
+    
+    self.contentHolderFrame = makeThingExist("Frame", {
+        BackgroundTransparency = 1, Position = UDim2.new(0, 198 * mobileScaleFactor, 0, 62 * mobileScaleFactor),
+        Size = UDim2.new(0, 548 * mobileScaleFactor, 0, 424 * mobileScaleFactor),
+        ClipsDescendants = true, Parent = self.mainFrameYay
+    })
+end
+
+function superMegaAwesomeLibrary:CreateNotificationHolderForCoolNotifs()
+    self.notificationHolderFrame = makeThingExist("Frame", {
+        BackgroundTransparency = 1, Position = UDim2.new(0, 20, 0.5, 0),
+        AnchorPoint = Vector2.new(0, 0.5), Size = UDim2.new(0, 300 * mobileScaleFactor, 0, 400),
+        Parent = self.screenGuiYay
+    })
+    makeThingExist("UIListLayout", {Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder, VerticalAlignment = Enum.VerticalAlignment.Center, Parent = self.notificationHolderFrame})
+end
+
+function superMegaAwesomeLibrary:Notify(config)
+    config = config or {}
+    config.Title = config.Title or "Notification"
+    config.Duration = config.Duration or 3
+    config.Icon = config.Icon or "rbxassetid://10747361219"
+    
+    local textSizeCalc = textServiceBeLikeText:GetTextSize(config.Title, 15 * mobileScaleFactor, Enum.Font.GothamSemibold, Vector2.new(math.huge, 50))
+    local notifWidth = math.max(127 * mobileScaleFactor, textSizeCalc.X + 80)
+    
+    local notificationFrame = makeThingExist("Frame", {
+        BackgroundColor3 = Color3.fromRGB(16, 16, 16), Position = UDim2.new(-1.5, 0, 0, 0),
+        Size = UDim2.new(0, notifWidth, 0, 50 * mobileScaleFactor), BackgroundTransparency = 1,
+        Parent = self.notificationHolderFrame
+    })
+    makeThingExist("UICorner", {CornerRadius = UDim.new(0, 10), Parent = notificationFrame})
+    makeThingExist("UIScale", {Scale = 0.8, Parent = notificationFrame})
+    
+    local pillThing = makeThingExist("Frame", {
+        BackgroundColor3 = self.config.AccentColor, Position = UDim2.new(0, 0, 0.22, 0),
+        Size = UDim2.new(0, 6, 0, 28 * mobileScaleFactor), Parent = notificationFrame
+    })
+    makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = pillThing})
+    
+    local notifImageLabel = makeThingExist("ImageLabel", {
+        Image = config.Icon, BackgroundTransparency = 1, Position = UDim2.new(0, 15, 0.5, -10 * mobileScaleFactor),
+        Size = UDim2.new(0, 20 * mobileScaleFactor, 0, 20 * mobileScaleFactor), ImageTransparency = 1,
+        Parent = notificationFrame
+    })
+    
+    local notifTextLabel = makeThingExist("TextLabel", {
+        FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
+        TextColor3 = Color3.new(1, 1, 1), Text = config.Title, BackgroundTransparency = 1,
+        Position = UDim2.new(0, 45, 0.5, -8.5 * mobileScaleFactor), TextSize = 15 * mobileScaleFactor,
+        Size = UDim2.new(0, textSizeCalc.X + 20, 0, 17 * mobileScaleFactor),
+        TextXAlignment = Enum.TextXAlignment.Left, TextTransparency = 1, Parent = notificationFrame
+    })
+    
+    local uiScaleRef = notificationFrame:FindFirstChild("UIScale")
+    task.defer(function()
+        smoothMoveGoWoosh(notificationFrame, {Position = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 0}, 0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+        smoothMoveGoWoosh(uiScaleRef, {Scale = 1}, 0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+        smoothMoveGoWoosh(notifImageLabel, {ImageTransparency = 0}, 0.3)
+        smoothMoveGoWoosh(notifTextLabel, {TextTransparency = 0}, 0.3)
+    end)
+    
+    task.delay(config.Duration, function()
+        if notificationFrame and notificationFrame.Parent then
+            smoothMoveGoWoosh(notificationFrame, {Position = UDim2.new(-1.5, 0, 0, 0), BackgroundTransparency = 1}, 0.5, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+            smoothMoveGoWoosh(uiScaleRef, {Scale = 0.8}, 0.5, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+            task.wait(0.5)
+            if notificationFrame and notificationFrame.Parent then notificationFrame:Destroy() end
+        end
+    end)
+    return notificationFrame
+end
+
+function superMegaAwesomeLibrary:CreateSection(config)
+    config = config or {}
+    config.Name = config.Name or "Section"
+    config.Icon = config.Icon or "rbxassetid://98092584632154"
+    
+    local sectionObj = {}
+    sectionObj.tabsInSection = {}
+    sectionObj.isExpanded = true
+    sectionObj.Library = self
+    
+    sectionObj.containerFrame = makeThingExist("Frame", {
+        BackgroundTransparency = 1, Size = UDim2.new(0, 158 * mobileScaleFactor, 0, 32 * mobileScaleFactor),
+        ClipsDescendants = true, Parent = self.sectionHolderScroll
+    })
+    
+    sectionObj.mainFrame = makeThingExist("Frame", {
+        BackgroundColor3 = Color3.fromRGB(18, 18, 18), Position = UDim2.new(0, 1, 0, 2),
+        Size = UDim2.new(0, 156 * mobileScaleFactor, 0, 28 * mobileScaleFactor), Parent = sectionObj.containerFrame
+    })
+    
+    local strokeThing = makeThingExist("UIStroke", {Color = Color3.fromRGB(33, 33, 33), Parent = sectionObj.mainFrame})
+    makeThingExist("UIGradient", {
+        Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.new(1,1,1)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(150,150,150)), ColorSequenceKeypoint.new(1, Color3.new(1,1,1))}),
+        Rotation = 260, Parent = strokeThing
+    })
+    makeThingExist("UICorner", {CornerRadius = UDim.new(0, 7), Parent = sectionObj.mainFrame})
+    
+    makeThingExist("ImageLabel", {
+        Image = config.Icon, BackgroundTransparency = 1,
+        Position = UDim2.new(0, 10, 0.5, -7 * mobileScaleFactor),
+        Size = UDim2.new(0, 14 * mobileScaleFactor, 0, 14 * mobileScaleFactor), Parent = sectionObj.mainFrame
+    })
+    
+    makeThingExist("TextLabel", {
+        FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
+        TextColor3 = Color3.new(1, 1, 1), Text = config.Name, BackgroundTransparency = 1,
+        Position = UDim2.new(0, 32, 0.5, -8.5 * mobileScaleFactor), TextSize = 15 * mobileScaleFactor,
+        Size = UDim2.new(0, 80, 0, 17 * mobileScaleFactor), TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = sectionObj.mainFrame
+    })
+    
+    local expandButtonImg = makeThingExist("ImageButton", {
+        Image = "rbxassetid://111626678408582", BackgroundTransparency = 1,
+        Position = UDim2.new(1, -24, 0.5, -8 * mobileScaleFactor),
+        Size = UDim2.new(0, 16 * mobileScaleFactor, 0, 16 * mobileScaleFactor), Parent = sectionObj.mainFrame
+    })
+    
+    sectionObj.tabHolderFrame = makeThingExist("Frame", {
+        BackgroundTransparency = 1, Position = UDim2.new(0, 11, 0, 39 * mobileScaleFactor),
+        Size = UDim2.new(0, 146 * mobileScaleFactor, 0, 0), Parent = sectionObj.containerFrame
+    })
+    
+    sectionObj.tabLayoutThing = makeThingExist("UIListLayout", {Padding = UDim.new(0, 5), SortOrder = Enum.SortOrder.LayoutOrder, Parent = sectionObj.tabHolderFrame})
+    
+    local function updateContainerSizeYay()
+        local tabsHeight = sectionObj.tabLayoutThing.AbsoluteContentSize.Y
+        sectionObj.tabHolderFrame.Size = UDim2.new(0, 146 * mobileScaleFactor, 0, tabsHeight)
+        if sectionObj.isExpanded then
+            smoothMoveGoWoosh(sectionObj.containerFrame, {Size = UDim2.new(0, 158 * mobileScaleFactor, 0, 32 * mobileScaleFactor + tabsHeight + 9)}, 0.25)
+        end
+    end
+    
+    sectionObj.tabLayoutThing:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateContainerSizeYay)
+    
+    expandButtonImg.MouseButton1Click:Connect(function()
+        sectionObj.isExpanded = not sectionObj.isExpanded
+        smoothMoveGoWoosh(expandButtonImg, {Rotation = sectionObj.isExpanded and 0 or -90}, 0.25)
+        if sectionObj.isExpanded then
+            local tabsHeight = sectionObj.tabLayoutThing.AbsoluteContentSize.Y
+            smoothMoveGoWoosh(sectionObj.containerFrame, {Size = UDim2.new(0, 158 * mobileScaleFactor, 0, 32 * mobileScaleFactor + tabsHeight + 9)}, 0.25)
+        else
+            smoothMoveGoWoosh(sectionObj.containerFrame, {Size = UDim2.new(0, 158 * mobileScaleFactor, 0, 32 * mobileScaleFactor)}, 0.25)
+        end
+    end)
+
+    function sectionObj:AddTab(tabConfig)
+        tabConfig = tabConfig or {}
+        tabConfig.Name = tabConfig.Name or "Tab"
+        tabConfig.Description = tabConfig.Description or "Tab description"
+        tabConfig.Icon = tabConfig.Icon or "rbxassetid://94219370057308"
+        
+        local tabObj = {}
+        tabObj.groupsInTab = {}
+        tabObj.groupPositions = {Left = 0, Right = 0}
+        tabObj.isActive = false
+        tabObj.Library = sectionObj.Library
+        
+        tabObj.buttonFrame = makeThingExist("Frame", {
+            BackgroundColor3 = sectionObj.Library.config.AccentColor, BackgroundTransparency = 1,
+            Size = UDim2.new(0, 136 * mobileScaleFactor, 0, 28 * mobileScaleFactor), Parent = sectionObj.tabHolderFrame
+        })
+        makeThingExist("UICorner", {CornerRadius = UDim.new(0, 7), Parent = tabObj.buttonFrame})
+        
+        tabObj.iconImg = makeThingExist("ImageLabel", {
+            ImageColor3 = Color3.fromRGB(89, 89, 89), Image = tabConfig.Icon, BackgroundTransparency = 1,
+            Position = UDim2.new(0, 9, 0.5, -7 * mobileScaleFactor),
+            Size = UDim2.new(0, 14 * mobileScaleFactor, 0, 14 * mobileScaleFactor), Parent = tabObj.buttonFrame
+        })
+        
+        tabObj.nameLabel = makeThingExist("TextLabel", {
+            FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
+            TextColor3 = Color3.fromRGB(89, 89, 89), Text = tabConfig.Name, BackgroundTransparency = 1,
+            Position = UDim2.new(0, 30, 0.5, -8 * mobileScaleFactor), TextSize = 15 * mobileScaleFactor,
+            Size = UDim2.new(0, 100 * mobileScaleFactor, 0, 16 * mobileScaleFactor),
+            TextXAlignment = Enum.TextXAlignment.Left, Parent = tabObj.buttonFrame
+        })
+        
+        local tabClickButton = makeThingExist("TextButton", {Text = "", BackgroundTransparency = 1, Size = UDim2.new(1, 0, 1, 0), Parent = tabObj.buttonFrame})
+        
+        tabObj.contentScroll = makeThingExist("ScrollingFrame", {
+            BackgroundTransparency = 1, Position = UDim2.new(0, 4, 0, 4),
+            Size = UDim2.new(1, -8, 1, -8), ScrollBarThickness = 0,
+            CanvasSize = UDim2.new(0, 540 * mobileScaleFactor, 0, 0), Visible = false,
+            Parent = sectionObj.Library.contentHolderFrame
+        })
+        
+        tabObj.leftColumnFrame = makeThingExist("Frame", {BackgroundTransparency = 1, Size = UDim2.new(0, 262 * mobileScaleFactor, 0, 1000), Parent = tabObj.contentScroll})
+        tabObj.rightColumnFrame = makeThingExist("Frame", {BackgroundTransparency = 1, Position = UDim2.new(0, 272 * mobileScaleFactor, 0, 0), Size = UDim2.new(0, 262 * mobileScaleFactor, 0, 1000), Parent = tabObj.contentScroll})
+        
+        function tabObj:Activate()
+            if sectionObj.Library.currentTabYay then sectionObj.Library.currentTabYay:Deactivate() end
+            sectionObj.Library.currentTabYay = tabObj
+            tabObj.isActive = true
+            tabObj.contentScroll.Visible = true
+            smoothMoveGoWoosh(tabObj.buttonFrame, {BackgroundTransparency = 0}, 0.2)
+            smoothMoveGoWoosh(tabObj.iconImg, {ImageColor3 = Color3.new(1, 1, 1)}, 0.2)
+            smoothMoveGoWoosh(tabObj.nameLabel, {TextColor3 = Color3.new(1, 1, 1)}, 0.2)
+            sectionObj.Library.tabNameLabel.Text = tabConfig.Name
+            sectionObj.Library.tabDescriptionLabel.Text = tabConfig.Description
+        end
+        
+        function tabObj:Deactivate()
+            tabObj.isActive = false
+            tabObj.contentScroll.Visible = false
+            smoothMoveGoWoosh(tabObj.buttonFrame, {BackgroundTransparency = 1}, 0.2)
+            smoothMoveGoWoosh(tabObj.iconImg, {ImageColor3 = Color3.fromRGB(89, 89, 89)}, 0.2)
+            smoothMoveGoWoosh(tabObj.nameLabel, {TextColor3 = Color3.fromRGB(89, 89, 89)}, 0.2)
+        end
+        
+        tabClickButton.MouseButton1Click:Connect(function() if not tabObj.isActive then tabObj:Activate() end end)
+        tabClickButton.MouseEnter:Connect(function()
+            if not tabObj.isActive then
+                smoothMoveGoWoosh(tabObj.nameLabel, {TextColor3 = Color3.fromRGB(150, 150, 150)}, 0.2)
+                smoothMoveGoWoosh(tabObj.iconImg, {ImageColor3 = Color3.fromRGB(150, 150, 150)}, 0.2)
+            end
+        end)
+        tabClickButton.MouseLeave:Connect(function()
+            if not tabObj.isActive then
+                smoothMoveGoWoosh(tabObj.nameLabel, {TextColor3 = Color3.fromRGB(89, 89, 89)}, 0.2)
+                smoothMoveGoWoosh(tabObj.iconImg, {ImageColor3 = Color3.fromRGB(89, 89, 89)}, 0.2)
+            end
+        end)
+
+        function tabObj:AddGroup(groupConfig)
+            groupConfig = groupConfig or {}
+            groupConfig.Name = groupConfig.Name or "Group"
+            groupConfig.Side = groupConfig.Side or "Left"
+            groupConfig.Icon = groupConfig.Icon or "rbxassetid://10723427199"
+            
+            local groupObj = {}
+            groupObj.elementsInGroup = {}
+            groupObj.Library = tabObj.Library
+            groupObj.elementYPos = 35 * mobileScaleFactor
+            
+            local parentColumn = groupConfig.Side == "Left" and tabObj.leftColumnFrame or tabObj.rightColumnFrame
+            local groupWidth = 260 * mobileScaleFactor
+            local yPosStart = tabObj.groupPositions[groupConfig.Side]
+            
+            groupObj.mainFrame = makeThingExist("Frame", {
+                BackgroundColor3 = Color3.fromRGB(18, 18, 18), Position = UDim2.new(0, 1, 0, yPosStart + 1),
+                Size = UDim2.new(0, groupWidth, 0, 50 * mobileScaleFactor), Parent = parentColumn
+            })
+            
+            local groupStrokeThing = makeThingExist("UIStroke", {Color = Color3.fromRGB(33, 33, 33), Parent = groupObj.mainFrame})
+            makeThingExist("UIGradient", {
+                Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.new(1,1,1)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(150,150,150)), ColorSequenceKeypoint.new(1, Color3.new(1,1,1))}),
+                Rotation = 260, Parent = groupStrokeThing
+            })
+            makeThingExist("UICorner", {CornerRadius = UDim.new(0, 11), Parent = groupObj.mainFrame})
+            
+            makeThingExist("ImageLabel", {
+                Image = groupConfig.Icon, BackgroundTransparency = 1, Position = UDim2.new(0, 10, 0, 10 * mobileScaleFactor),
+                Size = UDim2.new(0, 16 * mobileScaleFactor, 0, 16 * mobileScaleFactor), Parent = groupObj.mainFrame
+            })
+            
+            makeThingExist("TextLabel", {
+                FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
+                TextColor3 = Color3.new(1, 1, 1), Text = groupConfig.Name, BackgroundTransparency = 1,
+                Position = UDim2.new(0, 32, 0, 8 * mobileScaleFactor), TextSize = 15 * mobileScaleFactor,
+                Size = UDim2.new(0, 100, 0, 16 * mobileScaleFactor), TextXAlignment = Enum.TextXAlignment.Left,
+                Parent = groupObj.mainFrame
+            })
+            
+            local function updateGroupSizeYay()
+                local newHeight = groupObj.elementYPos + 10 * mobileScaleFactor
+                groupObj.mainFrame.Size = UDim2.new(0, groupWidth, 0, newHeight)
+                tabObj.groupPositions[groupConfig.Side] = yPosStart + newHeight + 15 * mobileScaleFactor
+                local maxHeight = math.max(tabObj.groupPositions.Left, tabObj.groupPositions.Right)
+                tabObj.contentScroll.CanvasSize = UDim2.new(0, 540 * mobileScaleFactor, 0, maxHeight)
+            end
+
+            function groupObj:AddToggle(toggleConfig)
+                toggleConfig = toggleConfig or {}
+                toggleConfig.Name = toggleConfig.Name or "Toggle"
+                toggleConfig.Default = toggleConfig.Default or false
+                toggleConfig.Callback = toggleConfig.Callback or function() end
+                
+                local toggleObj = {}
+                toggleObj.value = toggleConfig.Default
+                local yPosition = groupObj.elementYPos
+                
+                toggleObj.labelText = makeThingExist("TextLabel", {
+                    FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
+                    TextColor3 = Color3.fromRGB(124, 124, 124), Text = toggleConfig.Name, BackgroundTransparency = 1,
+                    Position = UDim2.new(0, 10, 0, yPosition), TextSize = 14 * mobileScaleFactor,
+                    Size = UDim2.new(0, 150 * mobileScaleFactor, 0, 20 * mobileScaleFactor),
+                    TextXAlignment = Enum.TextXAlignment.Left, Parent = groupObj.mainFrame
+                })
+                
+                toggleObj.switchFrame = makeThingExist("Frame", {
+                    BackgroundColor3 = toggleObj.value and groupObj.Library.config.AccentColor or Color3.fromRGB(32, 32, 32),
+                    Position = UDim2.new(1, -44 * mobileScaleFactor, 0, yPosition),
+                    Size = UDim2.new(0, 34 * mobileScaleFactor, 0, 21 * mobileScaleFactor), Parent = groupObj.mainFrame
+                })
+                makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = toggleObj.switchFrame})
+                
+                toggleObj.circleFrame = makeThingExist("Frame", {
+                    BackgroundColor3 = toggleObj.value and Color3.new(1, 1, 1) or Color3.fromRGB(75, 75, 75),
+                    Position = toggleObj.value and UDim2.new(0.462, 0, 0.143, 0) or UDim2.new(0.0104, 0, 0.143, 0),
+                    Size = UDim2.new(0, 15 * mobileScaleFactor, 0, 15 * mobileScaleFactor), Parent = toggleObj.switchFrame
+                })
+                makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = toggleObj.circleFrame})
+                
+                local toggleClickButton = makeThingExist("TextButton", {Text = "", BackgroundTransparency = 1, Size = UDim2.new(1, 0, 1, 0), Parent = toggleObj.switchFrame})
+                
+                function toggleObj:Set(value)
+                    toggleObj.value = value
+                    if toggleObj.value then
+                        smoothMoveGoWoosh(toggleObj.switchFrame, {BackgroundColor3 = groupObj.Library.config.AccentColor}, 0.2)
+                        smoothMoveGoWoosh(toggleObj.circleFrame, {Position = UDim2.new(0.462, 0, 0.143, 0), BackgroundColor3 = Color3.new(1, 1, 1)}, 0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+                    else
+                        smoothMoveGoWoosh(toggleObj.switchFrame, {BackgroundColor3 = Color3.fromRGB(32, 32, 32)}, 0.2)
+                        smoothMoveGoWoosh(toggleObj.circleFrame, {Position = UDim2.new(0.0104, 0, 0.143, 0), BackgroundColor3 = Color3.fromRGB(75, 75, 75)}, 0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+                    end
+                    toggleConfig.Callback(toggleObj.value)
+                end
+                
+                toggleClickButton.MouseButton1Click:Connect(function() toggleObj:Set(not toggleObj.value) end)
+                if toggleConfig.Default then toggleConfig.Callback(true) end
+                
+                groupObj.elementYPos = groupObj.elementYPos + 28 * mobileScaleFactor
+                updateGroupSizeYay()
+                table.insert(groupObj.elementsInGroup, toggleObj)
+                return toggleObj
+            end
+
+            function groupObj:AddSlider(sliderConfig)
+                sliderConfig = sliderConfig or {}
+                sliderConfig.Name = sliderConfig.Name or "Slider"
+                sliderConfig.Min = sliderConfig.Min or 0
+                sliderConfig.Max = sliderConfig.Max or 100
+                sliderConfig.Default = sliderConfig.Default or sliderConfig.Min
+                sliderConfig.Increment = sliderConfig.Increment or 1
+                sliderConfig.Callback = sliderConfig.Callback or function() end
+                
+                local sliderObj = {}
+                sliderObj.value = sliderConfig.Default
+                local yPosition = groupObj.elementYPos
+                local sliderWidth = 238 * mobileScaleFactor
+                
+                sliderObj.labelText = makeThingExist("TextLabel", {
+                    FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
+                    TextColor3 = Color3.fromRGB(124, 124, 124), Text = sliderConfig.Name, BackgroundTransparency = 1,
+                    Position = UDim2.new(0, 10, 0, yPosition), TextSize = 14 * mobileScaleFactor,
+                    Size = UDim2.new(0, 120 * mobileScaleFactor, 0, 20 * mobileScaleFactor),
+                    TextXAlignment = Enum.TextXAlignment.Left, Parent = groupObj.mainFrame
+                })
+                
+                sliderObj.backgroundFrame = makeThingExist("Frame", {
+                    BackgroundColor3 = Color3.fromRGB(32, 32, 32), Position = UDim2.new(0, 10, 0, yPosition + 22 * mobileScaleFactor),
+                    Size = UDim2.new(0, sliderWidth, 0, 12 * mobileScaleFactor), Parent = groupObj.mainFrame
+                })
+                makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = sliderObj.backgroundFrame})
+                
+                local percentage = (sliderObj.value - sliderConfig.Min) / (sliderConfig.Max - sliderConfig.Min)
+                sliderObj.fillFrame = makeThingExist("Frame", {
+                    BackgroundColor3 = groupObj.Library.config.AccentColor,
+                    Size = UDim2.new(0, sliderWidth * percentage, 0, 12 * mobileScaleFactor), Parent = sliderObj.backgroundFrame
+                })
+                makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = sliderObj.fillFrame})
+                
+                sliderObj.valueLabelText = makeThingExist("TextLabel", {
+                    FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
+                    TextColor3 = Color3.fromRGB(124, 124, 124), Text = tostring(sliderObj.value) .. " / " .. tostring(sliderConfig.Max),
+                    BackgroundTransparency = 1, Position = UDim2.new(1, -80 * mobileScaleFactor, 0, yPosition),
+                    TextSize = 14 * mobileScaleFactor, Size = UDim2.new(0, 70 * mobileScaleFactor, 0, 20 * mobileScaleFactor),
+                    TextXAlignment = Enum.TextXAlignment.Right, Parent = groupObj.mainFrame
+                })
+                
+                local sliderClickButton = makeThingExist("TextButton", {Text = "", BackgroundTransparency = 1, Size = UDim2.new(1, 0, 1, 0), Parent = sliderObj.backgroundFrame})
+                
+                function sliderObj:Set(value)
+                    value = math.clamp(value, sliderConfig.Min, sliderConfig.Max)
+                    value = math.floor(value / sliderConfig.Increment + 0.5) * sliderConfig.Increment
+                    sliderObj.value = value
+                    local percentage = (value - sliderConfig.Min) / (sliderConfig.Max - sliderConfig.Min)
+                    smoothMoveGoWoosh(sliderObj.fillFrame, {Size = UDim2.new(0, sliderWidth * percentage, 0, 12 * mobileScaleFactor)}, 0.1)
+                    sliderObj.valueLabelText.Text = tostring(value) .. " / " .. tostring(sliderConfig.Max)
+                    sliderConfig.Callback(value)
+                end
+                
+                local isDraggingSlider = false
+                sliderClickButton.MouseButton1Down:Connect(function() isDraggingSlider = true end)
+                thisInputServiceGoesHard.InputEnded:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then isDraggingSlider = false end
+                end)
+                thisInputServiceGoesHard.InputChanged:Connect(function(input)
+                    if isDraggingSlider and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                        local percentage = math.clamp((input.Position.X - sliderObj.backgroundFrame.AbsolutePosition.X) / sliderObj.backgroundFrame.AbsoluteSize.X, 0, 1)
+                        local value = sliderConfig.Min + (sliderConfig.Max - sliderConfig.Min) * percentage
+                        sliderObj:Set(value)
+                    end
+                end)
+                
+                if sliderConfig.Default ~= sliderConfig.Min then sliderConfig.Callback(sliderConfig.Default) end
+                groupObj.elementYPos = groupObj.elementYPos + 40 * mobileScaleFactor
+                updateGroupSizeYay()
+                table.insert(groupObj.elementsInGroup, sliderObj)
+                return sliderObj
+            end
+
+            function groupObj:AddButton(buttonConfig)
+                buttonConfig = buttonConfig or {}
+                buttonConfig.Name = buttonConfig.Name or "Button"
+                buttonConfig.Icon = buttonConfig.Icon
+                buttonConfig.Locked = buttonConfig.Locked or false
+                buttonConfig.Callback = buttonConfig.Callback or function() end
+                
+                local buttonObj = {}
+                buttonObj.isLocked = buttonConfig.Locked
+                local yPosition = groupObj.elementYPos
+                local buttonWidth = 238 * mobileScaleFactor
+                
+                buttonObj.mainFrame = makeThingExist("Frame", {
+                    BackgroundColor3 = buttonObj.isLocked and Color3.fromRGB(24, 24, 24) or Color3.fromRGB(32, 32, 32),
+                    Position = UDim2.new(0, 10, 0, yPosition),
+                    Size = UDim2.new(0, buttonWidth, 0, 26 * mobileScaleFactor), Parent = groupObj.mainFrame
+                })
+                makeThingExist("UICorner", {CornerRadius = UDim.new(0, 6), Parent = buttonObj.mainFrame})
+                
+                local buttonStrokeThing = makeThingExist("UIStroke", {Color = buttonObj.isLocked and Color3.fromRGB(32, 32, 32) or Color3.fromRGB(48, 48, 48), Parent = buttonObj.mainFrame})
+                makeThingExist("UIGradient", {
+                    Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.new(1,1,1)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(150,150,150)), ColorSequenceKeypoint.new(1, Color3.new(1,1,1))}),
+                    Rotation = 260, Parent = buttonStrokeThing
+                })
+                
+                local textXPos = 8
+                if buttonConfig.Icon then
+                    makeThingExist("ImageLabel", {
+                        ImageColor3 = buttonObj.isLocked and Color3.fromRGB(50, 50, 50) or Color3.fromRGB(125, 125, 125),
+                        Image = buttonConfig.Icon, BackgroundTransparency = 1,
+                        Position = UDim2.new(0, 8, 0.5, -8 * mobileScaleFactor),
+                        Size = UDim2.new(0, 16 * mobileScaleFactor, 0, 16 * mobileScaleFactor), Parent = buttonObj.mainFrame
+                    })
+                    textXPos = 30
+                end
+                
+                buttonObj.labelText = makeThingExist("TextLabel", {
+                    FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
+                    TextColor3 = buttonObj.isLocked and Color3.fromRGB(46, 46, 46) or Color3.fromRGB(120, 120, 120),
+                    Text = buttonConfig.Name .. (buttonObj.isLocked and " (locked)" or ""), BackgroundTransparency = 1,
+                    Position = UDim2.new(0, textXPos * mobileScaleFactor, 0, 0), TextSize = 14 * mobileScaleFactor,
+                    Size = UDim2.new(1, -textXPos * mobileScaleFactor - 10, 1, 0),
+                    TextXAlignment = Enum.TextXAlignment.Left, Parent = buttonObj.mainFrame
+                })
+                
+                local buttonClickButton = makeThingExist("TextButton", {Text = "", BackgroundTransparency = 1, Size = UDim2.new(1, 0, 1, 0), Parent = buttonObj.mainFrame})
+                buttonClickButton.MouseButton1Click:Connect(function() if not buttonObj.isLocked then buttonConfig.Callback() end end)
+                buttonClickButton.MouseEnter:Connect(function() if not buttonObj.isLocked then smoothMoveGoWoosh(buttonObj.mainFrame, {BackgroundColor3 = Color3.fromRGB(40, 40, 40)}, 0.2) end end)
+                buttonClickButton.MouseLeave:Connect(function() if not buttonObj.isLocked then smoothMoveGoWoosh(buttonObj.mainFrame, {BackgroundColor3 = Color3.fromRGB(32, 32, 32)}, 0.2) end end)
+                
+                groupObj.elementYPos = groupObj.elementYPos + 32 * mobileScaleFactor
+                updateGroupSizeYay()
+                table.insert(groupObj.elementsInGroup, buttonObj)
+                return buttonObj
+            end
+
+            function groupObj:AddKeybind(keybindConfig)
+                keybindConfig = keybindConfig or {}
+                keybindConfig.Name = keybindConfig.Name or "Keybind"
+                keybindConfig.Default = keybindConfig.Default or Enum.KeyCode.Unknown
+                keybindConfig.Callback = keybindConfig.Callback or function() end
+                keybindConfig.ChangedCallback = keybindConfig.ChangedCallback or function() end
+                
+                local keybindObj = {}
+                keybindObj.value = keybindConfig.Default
+                keybindObj.isListening = false
+                local yPosition = groupObj.elementYPos
+                
+                keybindObj.labelText = makeThingExist("TextLabel", {
+                    FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
+                    TextColor3 = Color3.fromRGB(124, 124, 124), Text = keybindConfig.Name, BackgroundTransparency = 1,
+                    Position = UDim2.new(0, 10, 0, yPosition), TextSize = 14 * mobileScaleFactor,
+                    Size = UDim2.new(0, 120 * mobileScaleFactor, 0, 20 * mobileScaleFactor),
+                    TextXAlignment = Enum.TextXAlignment.Left, Parent = groupObj.mainFrame
+                })
+                
+                local keyText = keybindObj.value == Enum.KeyCode.Unknown and "None" or keybindObj.value.Name
+                local keyWidth = math.max(48 * mobileScaleFactor, howWideIsThisText(keyText, 12 * mobileScaleFactor) + 30 * mobileScaleFactor)
+                
+                keybindObj.buttonFrame = makeThingExist("Frame", {
+                    BackgroundColor3 = Color3.fromRGB(32, 32, 32), Position = UDim2.new(1, -keyWidth - 10, 0, yPosition),
+                    Size = UDim2.new(0, keyWidth, 0, 21 * mobileScaleFactor), Parent = groupObj.mainFrame
+                })
+                makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = keybindObj.buttonFrame})
+                
+                local keybindStrokeThing = makeThingExist("UIStroke", {Color = Color3.fromRGB(40, 40, 40), Parent = keybindObj.buttonFrame})
+                makeThingExist("UIGradient", {
+                    Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.new(1,1,1)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(150,150,150)), ColorSequenceKeypoint.new(1, Color3.new(1,1,1))}),
+                    Rotation = 260, Parent = keybindStrokeThing
+                })
+                
+                keybindObj.keyLabelText = makeThingExist("TextLabel", {
+                    FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
+                    TextColor3 = Color3.fromRGB(113, 113, 113), Text = keyText, BackgroundTransparency = 1,
+                    Position = UDim2.new(0, 2, 0, 0), TextSize = 12 * mobileScaleFactor,
+                    Size = UDim2.new(1, -24 * mobileScaleFactor, 1, 0), TextXAlignment = Enum.TextXAlignment.Left,
+                    Parent = keybindObj.buttonFrame
+                })
+                makeThingExist("UIPadding", {PaddingLeft = UDim.new(0, 2), Parent = keybindObj.keyLabelText})
+                
+                keybindObj.keyboardIconImg = makeThingExist("ImageLabel", {
+                    ImageColor3 = Color3.fromRGB(76, 76, 76), Image = "rbxassetid://10723416765", BackgroundTransparency = 1,
+                    Position = UDim2.new(1, -18 * mobileScaleFactor, 0.5, -7 * mobileScaleFactor),
+                    Size = UDim2.new(0, 14 * mobileScaleFactor, 0, 14 * mobileScaleFactor), Parent = keybindObj.buttonFrame
+                })
+                
+                local keybindClickButton = makeThingExist("TextButton", {Text = "", BackgroundTransparency = 1, Size = UDim2.new(1, 0, 1, 0), Parent = keybindObj.buttonFrame})
+                
+                local function updateKeybindSizeYay(text)
+                    local newWidth = math.max(48 * mobileScaleFactor, howWideIsThisText(text, 12 * mobileScaleFactor) + 30 * mobileScaleFactor)
+                    smoothMoveGoWoosh(keybindObj.buttonFrame, {Size = UDim2.new(0, newWidth, 0, 21 * mobileScaleFactor), Position = UDim2.new(1, -newWidth - 10, 0, yPosition)}, 0.15)
+                end
+                
+                function keybindObj:Set(key)
+                    keybindObj.value = key
+                    local keyText = key == Enum.KeyCode.Unknown and "None" or key.Name
+                    keybindObj.keyLabelText.Text = keyText
+                    updateKeybindSizeYay(keyText)
+                    keybindConfig.ChangedCallback(key)
+                end
+                
+                keybindClickButton.MouseButton1Click:Connect(function()
+                    keybindObj.isListening = true
+                    keybindObj.keyLabelText.Text = "..."
+                    updateKeybindSizeYay("...")
+                    smoothMoveGoWoosh(keybindObj.buttonFrame, {BackgroundColor3 = Color3.fromRGB(48, 48, 48)}, 0.2)
+                end)
+                
+                thisInputServiceGoesHard.InputBegan:Connect(function(input, gameProcessed)
+                    if keybindObj.isListening then
+                        if input.UserInputType == Enum.UserInputType.Keyboard then
+                            keybindObj.isListening = false
+                            keybindObj:Set(input.KeyCode)
+                            smoothMoveGoWoosh(keybindObj.buttonFrame, {BackgroundColor3 = Color3.fromRGB(32, 32, 32)}, 0.2)
+                        end
+                    elseif not gameProcessed and input.UserInputType == Enum.UserInputType.Keyboard then
+                        if input.KeyCode == keybindObj.value then keybindConfig.Callback() end
+                    end
+                end)
+                
+                keybindClickButton.MouseEnter:Connect(function()
+                    if not keybindObj.isListening then smoothMoveGoWoosh(keybindObj.buttonFrame, {BackgroundColor3 = Color3.fromRGB(48, 48, 48)}, 0.2) end
+                end)
+                keybindClickButton.MouseLeave:Connect(function()
+                    if not keybindObj.isListening then smoothMoveGoWoosh(keybindObj.buttonFrame, {BackgroundColor3 = Color3.fromRGB(32, 32, 32)}, 0.2) end
+                end)
+                
+                groupObj.elementYPos = groupObj.elementYPos + 28 * mobileScaleFactor
+                updateGroupSizeYay()
+                table.insert(groupObj.elementsInGroup, keybindObj)
+                return keybindObj
+            end
+
+            function groupObj:AddKeybindToggle(keybindToggleConfig)
+                keybindToggleConfig = keybindToggleConfig or {}
+                keybindToggleConfig.Name = keybindToggleConfig.Name or "Keybind Toggle"
+                keybindToggleConfig.Default = keybindToggleConfig.Default or Enum.KeyCode.Unknown
+                keybindToggleConfig.ToggleDefault = keybindToggleConfig.ToggleDefault or false
+                keybindToggleConfig.Callback = keybindToggleConfig.Callback or function() end
+                keybindToggleConfig.ToggleCallback = keybindToggleConfig.ToggleCallback or function() end
+                keybindToggleConfig.ChangedCallback = keybindToggleConfig.ChangedCallback or function() end
+                
+                local keybindToggleObj = {}
+                keybindToggleObj.keyValue = keybindToggleConfig.Default
+                keybindToggleObj.toggleValue = keybindToggleConfig.ToggleDefault
+                keybindToggleObj.isListening = false
+                local yPosition = groupObj.elementYPos
+                
+                keybindToggleObj.labelText = makeThingExist("TextLabel", {
+                    FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
+                    TextColor3 = Color3.fromRGB(124, 124, 124), Text = keybindToggleConfig.Name, BackgroundTransparency = 1,
+                    Position = UDim2.new(0, 10, 0, yPosition), TextSize = 14 * mobileScaleFactor,
+                    Size = UDim2.new(0, 100 * mobileScaleFactor, 0, 20 * mobileScaleFactor),
+                    TextXAlignment = Enum.TextXAlignment.Left, Parent = groupObj.mainFrame
+                })
+                
+                local keyText = keybindToggleObj.keyValue == Enum.KeyCode.Unknown and "None" or keybindToggleObj.keyValue.Name
+                local keyWidth = math.max(48 * mobileScaleFactor, howWideIsThisText(keyText, 12 * mobileScaleFactor) + 30 * mobileScaleFactor)
+                
+                keybindToggleObj.keybindButtonFrame = makeThingExist("Frame", {
+                    BackgroundColor3 = Color3.fromRGB(32, 32, 32), Position = UDim2.new(1, -keyWidth - 10, 0, yPosition),
+                    Size = UDim2.new(0, keyWidth, 0, 21 * mobileScaleFactor), Parent = groupObj.mainFrame
+                })
+                makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = keybindToggleObj.keybindButtonFrame})
+                
+                local keybindStrokeThing = makeThingExist("UIStroke", {Color = Color3.fromRGB(40, 40, 40), Parent = keybindToggleObj.keybindButtonFrame})
+                
+                keybindToggleObj.keyLabelText = makeThingExist("TextLabel", {
+                    FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
+                    TextColor3 = Color3.fromRGB(113, 113, 113), Text = keyText, BackgroundTransparency = 1,
+                    Position = UDim2.new(0, 6, 0, 0), TextSize = 12 * mobileScaleFactor,
+                    Size = UDim2.new(1, -24 * mobileScaleFactor, 1, 0), TextXAlignment = Enum.TextXAlignment.Left,
+                    Parent = keybindToggleObj.keybindButtonFrame
+                })
+                
+                keybindToggleObj.keyboardIconImg = makeThingExist("ImageLabel", {
+                    ImageColor3 = Color3.fromRGB(76, 76, 76), Image = "rbxassetid://10723416765", BackgroundTransparency = 1,
+                    Position = UDim2.new(1, -18 * mobileScaleFactor, 0.5, -7 * mobileScaleFactor),
+                    Size = UDim2.new(0, 14 * mobileScaleFactor, 0, 14 * mobileScaleFactor), Parent = keybindToggleObj.keybindButtonFrame
+                })
+                
+                keybindToggleObj.toggleSwitchFrame = makeThingExist("Frame", {
+                    BackgroundColor3 = keybindToggleObj.toggleValue and groupObj.Library.config.AccentColor or Color3.fromRGB(32, 32, 32),
+                    Position = UDim2.new(1, -keyWidth - 48 * mobileScaleFactor, 0, yPosition),
+                    Size = UDim2.new(0, 34 * mobileScaleFactor, 0, 21 * mobileScaleFactor), Parent = groupObj.mainFrame
+                })
+                makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = keybindToggleObj.toggleSwitchFrame})
+                
+                keybindToggleObj.toggleCircleFrame = makeThingExist("Frame", {
+                    BackgroundColor3 = keybindToggleObj.toggleValue and Color3.new(1, 1, 1) or Color3.fromRGB(75, 75, 75),
+                    Position = keybindToggleObj.toggleValue and UDim2.new(0.462, 0, 0.143, 0) or UDim2.new(0.0104, 0, 0.143, 0),
+                    Size = UDim2.new(0, 15 * mobileScaleFactor, 0, 15 * mobileScaleFactor), Parent = keybindToggleObj.toggleSwitchFrame
+                })
+                makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = keybindToggleObj.toggleCircleFrame})
+                
+                local toggleClickButton = makeThingExist("TextButton", {Text = "", BackgroundTransparency = 1, Size = UDim2.new(1, 0, 1, 0), Parent = keybindToggleObj.toggleSwitchFrame})
+                local keybindClickButton = makeThingExist("TextButton", {Text = "", BackgroundTransparency = 1, Size = UDim2.new(1, 0, 1, 0), Parent = keybindToggleObj.keybindButtonFrame})
+                
+                function keybindToggleObj:SetToggle(value)
+                    keybindToggleObj.toggleValue = value
+                    if value then
+                        smoothMoveGoWoosh(keybindToggleObj.toggleSwitchFrame, {BackgroundColor3 = groupObj.Library.config.AccentColor}, 0.2)
+                        smoothMoveGoWoosh(keybindToggleObj.toggleCircleFrame, {Position = UDim2.new(0.462, 0, 0.143, 0), BackgroundColor3 = Color3.new(1, 1, 1)}, 0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+                    else
+                        smoothMoveGoWoosh(keybindToggleObj.toggleSwitchFrame, {BackgroundColor3 = Color3.fromRGB(32, 32, 32)}, 0.2)
+                        smoothMoveGoWoosh(keybindToggleObj.toggleCircleFrame, {Position = UDim2.new(0.0104, 0, 0.143, 0), BackgroundColor3 = Color3.fromRGB(75, 75, 75)}, 0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+                    end
+                    keybindToggleConfig.ToggleCallback(value)
+                end
+                
+                local function updateKeybindSizeYay(text)
+                    local newWidth = math.max(48 * mobileScaleFactor, howWideIsThisText(text, 12 * mobileScaleFactor) + 30 * mobileScaleFactor)
+                    smoothMoveGoWoosh(keybindToggleObj.keybindButtonFrame, {Size = UDim2.new(0, newWidth, 0, 21 * mobileScaleFactor), Position = UDim2.new(1, -newWidth - 10, 0, yPosition)}, 0.15)
+                    smoothMoveGoWoosh(keybindToggleObj.toggleSwitchFrame, {Position = UDim2.new(1, -newWidth - 48 * mobileScaleFactor, 0, yPosition)}, 0.15)
+                end
+                
+                function keybindToggleObj:SetKey(key)
+                    keybindToggleObj.keyValue = key
+                    local keyText = key == Enum.KeyCode.Unknown and "None" or key.Name
+                    keybindToggleObj.keyLabelText.Text = keyText
+                    updateKeybindSizeYay(keyText)
+                    keybindToggleConfig.ChangedCallback(key)
+                end
+                
+                toggleClickButton.MouseButton1Click:Connect(function() keybindToggleObj:SetToggle(not keybindToggleObj.toggleValue) end)
+                keybindClickButton.MouseButton1Click:Connect(function()
+                    keybindToggleObj.isListening = true
+                    keybindToggleObj.keyLabelText.Text = "..."
+                    updateKeybindSizeYay("...")
+                    smoothMoveGoWoosh(keybindToggleObj.keybindButtonFrame, {BackgroundColor3 = Color3.fromRGB(48, 48, 48)}, 0.2)
+                end)
+                
+                thisInputServiceGoesHard.InputBegan:Connect(function(input, gameProcessed)
+                    if keybindToggleObj.isListening then
+                        if input.UserInputType == Enum.UserInputType.Keyboard then
+                            keybindToggleObj.isListening = false
+                            keybindToggleObj:SetKey(input.KeyCode)
+                            smoothMoveGoWoosh(keybindToggleObj.keybindButtonFrame, {BackgroundColor3 = Color3.fromRGB(32, 32, 32)}, 0.2)
+                        end
+                    elseif not gameProcessed and input.UserInputType == Enum.UserInputType.Keyboard then
+                        if input.KeyCode == keybindToggleObj.keyValue and keybindToggleObj.toggleValue then
+                            keybindToggleConfig.Callback()
+                        end
+                    end
+                end)
+                
+                keybindClickButton.MouseEnter:Connect(function() if not keybindToggleObj.isListening then smoothMoveGoWoosh(keybindToggleObj.keybindButtonFrame, {BackgroundColor3 = Color3.fromRGB(48, 48, 48)}, 0.2) end end)
+                keybindClickButton.MouseLeave:Connect(function() if not keybindToggleObj.isListening then smoothMoveGoWoosh(keybindToggleObj.keybindButtonFrame, {BackgroundColor3 = Color3.fromRGB(32, 32, 32)}, 0.2) end end)
+                
+                if keybindToggleConfig.ToggleDefault then keybindToggleConfig.ToggleCallback(true) end
+                groupObj.elementYPos = groupObj.elementYPos + 28 * mobileScaleFactor
+                updateGroupSizeYay()
+                table.insert(groupObj.elementsInGroup, keybindToggleObj)
+                return keybindToggleObj
+            end
+
+            function groupObj:AddDropdown(dropdownConfig)
+                dropdownConfig = dropdownConfig or {}
+                dropdownConfig.Name = dropdownConfig.Name or "Dropdown"
+                dropdownConfig.Options = dropdownConfig.Options or {"Option 1", "Option 2", "Option 3"}
+                dropdownConfig.Default = dropdownConfig.Default or dropdownConfig.Options[1]
+                dropdownConfig.Callback = dropdownConfig.Callback or function() end
+                
+                local dropdownObj = {}
+                dropdownObj.value = dropdownConfig.Default
+                dropdownObj.isOpen = false
+                local yPosition = groupObj.elementYPos
+                
+                dropdownObj.labelText = makeThingExist("TextLabel", {
+                    FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
+                    TextColor3 = Color3.fromRGB(124, 124, 124), Text = dropdownConfig.Name, BackgroundTransparency = 1,
+                    Position = UDim2.new(0, 10, 0, yPosition), TextSize = 14 * mobileScaleFactor,
+                    Size = UDim2.new(0, 100 * mobileScaleFactor, 0, 20 * mobileScaleFactor),
+                    TextXAlignment = Enum.TextXAlignment.Left, Parent = groupObj.mainFrame
+                })
+                
+                local displayText = dropdownObj.value or "None"
+                local buttonWidth = math.max(70 * mobileScaleFactor, howWideIsThisText(displayText, 12 * mobileScaleFactor) + 30 * mobileScaleFactor)
+                
+                dropdownObj.buttonFrame = makeThingExist("Frame", {
+                    BackgroundColor3 = Color3.fromRGB(32, 32, 32), Position = UDim2.new(1, -buttonWidth - 10, 0, yPosition),
+                    Size = UDim2.new(0, buttonWidth, 0, 21 * mobileScaleFactor), Parent = groupObj.mainFrame
+                })
+                makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = dropdownObj.buttonFrame})
+                
+                local dropdownStrokeThing = makeThingExist("UIStroke", {Color = Color3.fromRGB(44, 44, 44), Parent = dropdownObj.buttonFrame})
+                
+                dropdownObj.selectedLabelText = makeThingExist("TextLabel", {
+                    FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
+                    TextColor3 = Color3.fromRGB(84, 84, 84), Text = displayText, BackgroundTransparency = 1,
+                    Position = UDim2.new(0, 8, 0, 0), TextSize = 12 * mobileScaleFactor,
+                    Size = UDim2.new(1, -28 * mobileScaleFactor, 1, 0), TextXAlignment = Enum.TextXAlignment.Left,
+                    TextTruncate = Enum.TextTruncate.AtEnd, Parent = dropdownObj.buttonFrame
+                })
+                
+                dropdownObj.arrowImg = makeThingExist("ImageLabel", {
+                    ImageColor3 = Color3.fromRGB(80, 80, 80), Image = "rbxassetid://111626678408582", BackgroundTransparency = 1,
+                    Position = UDim2.new(1, -20 * mobileScaleFactor, 0.5, -7 * mobileScaleFactor),
+                    Size = UDim2.new(0, 14 * mobileScaleFactor, 0, 14 * mobileScaleFactor), Parent = dropdownObj.buttonFrame
+                })
+                
+                dropdownObj.optionHolderFrame = makeThingExist("Frame", {
+                    BackgroundColor3 = Color3.fromRGB(16, 16, 16), Size = UDim2.new(0, 122 * mobileScaleFactor, 0, 0),
+                    ClipsDescendants = true, Visible = false, ZIndex = 9999, Parent = groupObj.Library.dropdownHolderRef
+                })
+                makeThingExist("UICorner", {CornerRadius = UDim.new(0, 6), Parent = dropdownObj.optionHolderFrame})
+                makeThingExist("UIStroke", {Color = Color3.fromRGB(40, 40, 40), Parent = dropdownObj.optionHolderFrame})
+                
+                makeThingExist("TextLabel", {
+                    FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
+                    TextColor3 = Color3.new(1, 1, 1), Text = dropdownConfig.Name, BackgroundTransparency = 1,
+                    Position = UDim2.new(0, 12, 0, 8 * mobileScaleFactor), TextSize = 14 * mobileScaleFactor,
+                    Size = UDim2.new(1, -24, 0, 20 * mobileScaleFactor), TextXAlignment = Enum.TextXAlignment.Left,
+                    ZIndex = 10000, Parent = dropdownObj.optionHolderFrame
+                })
+                
+                dropdownObj.optionContainerFrame = makeThingExist("Frame", {
+                    BackgroundTransparency = 1, Position = UDim2.new(0, 0, 0, 30 * mobileScaleFactor),
+                    Size = UDim2.new(1, 0, 0, 0), ZIndex = 10000, Parent = dropdownObj.optionHolderFrame
+                })
+                
+                local function createOptionsYay()
+                    for _, child in pairs(dropdownObj.optionContainerFrame:GetChildren()) do
+                        if child:IsA("TextLabel") or child:IsA("TextButton") then child:Destroy() end
+                    end
+                    local optY = 0
+                    for _, option in ipairs(dropdownConfig.Options) do
+                        local isSelected = dropdownObj.value == option
+                        local optionLabelText = makeThingExist("TextLabel", {
+                            FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
+                            TextColor3 = isSelected and groupObj.Library.config.AccentColor or Color3.fromRGB(124, 124, 124),
+                            Text = option, BackgroundTransparency = 1, Position = UDim2.new(0, 12, 0, optY),
+                            TextSize = 14 * mobileScaleFactor, Size = UDim2.new(1, -24, 0, 18 * mobileScaleFactor),
+                            TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 10001, Parent = dropdownObj.optionContainerFrame
+                        })
+                        local optionClickButton = makeThingExist("TextButton", {
+                            Text = "", BackgroundTransparency = 1, Position = UDim2.new(0, 0, 0, optY),
+                            Size = UDim2.new(1, 0, 0, 20 * mobileScaleFactor), ZIndex = 10002, Parent = dropdownObj.optionContainerFrame
+                        })
+                        optionClickButton.MouseButton1Click:Connect(function()
+                            dropdownObj.value = option
+                            dropdownObj.isOpen = false
+                            smoothMoveGoWoosh(dropdownObj.optionHolderFrame, {Size = UDim2.new(0, 122 * mobileScaleFactor, 0, 0)}, 0.2)
+                            smoothMoveGoWoosh(dropdownObj.arrowImg, {Rotation = 0}, 0.2)
+                            task.delay(0.2, function() if dropdownObj.optionHolderFrame.Parent then dropdownObj.optionHolderFrame.Visible = false end end)
+                            dropdownObj.selectedLabelText.Text = option
+                            local newWidth = math.max(70 * mobileScaleFactor, howWideIsThisText(option, 12 * mobileScaleFactor) + 30 * mobileScaleFactor)
+                            smoothMoveGoWoosh(dropdownObj.buttonFrame, {Size = UDim2.new(0, newWidth, 0, 21 * mobileScaleFactor), Position = UDim2.new(1, -newWidth - 10, 0, yPosition)}, 0.15)
+                            createOptionsYay()
+                            dropdownConfig.Callback(option)
+                        end)
+                        optionClickButton.MouseEnter:Connect(function() if dropdownObj.value ~= option then smoothMoveGoWoosh(optionLabelText, {TextColor3 = Color3.fromRGB(180, 180, 180)}, 0.2) end end)
+                        optionClickButton.MouseLeave:Connect(function() if dropdownObj.value ~= option then smoothMoveGoWoosh(optionLabelText, {TextColor3 = Color3.fromRGB(124, 124, 124)}, 0.2) end end)
+                        optY = optY + 22 * mobileScaleFactor
+                    end
+                end
+                createOptionsYay()
+                
+                local dropdownClickButton = makeThingExist("TextButton", {Text = "", BackgroundTransparency = 1, Size = UDim2.new(1, 0, 1, 0), Parent = dropdownObj.buttonFrame})
+                
+                local function updateDropdownPositionYay()
+                    local buttonAbsPos = dropdownObj.buttonFrame.AbsolutePosition
+                    local buttonAbsSize = dropdownObj.buttonFrame.AbsoluteSize
+                    dropdownObj.optionHolderFrame.Position = UDim2.new(0, buttonAbsPos.X, 0, buttonAbsPos.Y + buttonAbsSize.Y + 5)
+                end
+                
+                dropdownClickButton.MouseButton1Click:Connect(function()
+                    dropdownObj.isOpen = not dropdownObj.isOpen
+                    if dropdownObj.isOpen then
+                        updateDropdownPositionYay()
+                        dropdownObj.optionHolderFrame.Visible = true
+                        local height = (35 + (#dropdownConfig.Options * 22)) * mobileScaleFactor
+                        smoothMoveGoWoosh(dropdownObj.optionHolderFrame, {Size = UDim2.new(0, 122 * mobileScaleFactor, 0, height)}, 0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+                        smoothMoveGoWoosh(dropdownObj.arrowImg, {Rotation = 180}, 0.2)
+                    else
+                        smoothMoveGoWoosh(dropdownObj.optionHolderFrame, {Size = UDim2.new(0, 122 * mobileScaleFactor, 0, 0)}, 0.2)
+                        smoothMoveGoWoosh(dropdownObj.arrowImg, {Rotation = 0}, 0.2)
+                        task.delay(0.2, function() if dropdownObj.optionHolderFrame.Parent then dropdownObj.optionHolderFrame.Visible = false end end)
+                    end
+                end)
+                
+                dropdownClickButton.MouseEnter:Connect(function()
+                    smoothMoveGoWoosh(dropdownObj.buttonFrame, {BackgroundColor3 = Color3.fromRGB(48, 48, 48)}, 0.2)
+                    smoothMoveGoWoosh(dropdownStrokeThing, {Color = Color3.fromRGB(83, 83, 83)}, 0.2)
+                end)
+                dropdownClickButton.MouseLeave:Connect(function()
+                    if not dropdownObj.isOpen then
+                        smoothMoveGoWoosh(dropdownObj.buttonFrame, {BackgroundColor3 = Color3.fromRGB(32, 32, 32)}, 0.2)
+                        smoothMoveGoWoosh(dropdownStrokeThing, {Color = Color3.fromRGB(44, 44, 44)}, 0.2)
+                    end
+                end)
+                
+                function dropdownObj:Set(value)
+                    dropdownObj.value = value
+                    dropdownObj.selectedLabelText.Text = value
+                    local newWidth = math.max(70 * mobileScaleFactor, howWideIsThisText(value, 12 * mobileScaleFactor) + 30 * mobileScaleFactor)
+                    dropdownObj.buttonFrame.Size = UDim2.new(0, newWidth, 0, 21 * mobileScaleFactor)
+                    dropdownObj.buttonFrame.Position = UDim2.new(1, -newWidth - 10, 0, yPosition)
+                    createOptionsYay()
+                    dropdownConfig.Callback(value)
+                end
+                
+                groupObj.elementYPos = groupObj.elementYPos + 28 * mobileScaleFactor
+                updateGroupSizeYay()
+                table.insert(groupObj.elementsInGroup, dropdownObj)
+                return dropdownObj
+            end
+
+            function groupObj:AddMultiDropdown(multiDropdownConfig)
+                multiDropdownConfig = multiDropdownConfig or {}
+                multiDropdownConfig.Name = multiDropdownConfig.Name or "Multi Dropdown"
+                multiDropdownConfig.Options = multiDropdownConfig.Options or {"Option 1", "Option 2", "Option 3"}
+                multiDropdownConfig.Default = multiDropdownConfig.Default or {}
+                multiDropdownConfig.Callback = multiDropdownConfig.Callback or function() end
+                
+                local multiDropdownObj = {}
+                multiDropdownObj.selectedValues = {}
+                for _, v in ipairs(multiDropdownConfig.Default) do multiDropdownObj.selectedValues[v] = true end
+                multiDropdownObj.isOpen = false
+                local yPosition = groupObj.elementYPos
+                
+                multiDropdownObj.labelText = makeThingExist("TextLabel", {
+                    FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
+                    TextColor3 = Color3.fromRGB(124, 124, 124), Text = multiDropdownConfig.Name, BackgroundTransparency = 1,
+                    Position = UDim2.new(0, 10, 0, yPosition), TextSize = 14 * mobileScaleFactor,
+                    Size = UDim2.new(0, 100 * mobileScaleFactor, 0, 20 * mobileScaleFactor),
+                    TextXAlignment = Enum.TextXAlignment.Left, Parent = groupObj.mainFrame
+                })
+                
+                local function getDisplayText()
+                    local selected = {}
+                    for option, isSelected in pairs(multiDropdownObj.selectedValues) do
+                        if isSelected then table.insert(selected, option) end
+                    end
+                    if #selected == 0 then return "None"
+                    elseif #selected == 1 then return selected[1]
+                    elseif #selected <= 2 then return table.concat(selected, ", ")
+                    else return #selected .. " selected" end
+                end
+                
+                local function getSelectedArray()
+                    local arr = {}
+                    for option, isSelected in pairs(multiDropdownObj.selectedValues) do
+                        if isSelected then table.insert(arr, option) end
+                    end
+                    return arr
+                end
+                
+                local displayText = getDisplayText()
+                local buttonWidth = math.max(85 * mobileScaleFactor, howWideIsThisText(displayText, 12 * mobileScaleFactor) + 35 * mobileScaleFactor)
+                
+                multiDropdownObj.buttonFrame = makeThingExist("Frame", {
+                    BackgroundColor3 = Color3.fromRGB(32, 32, 32), Position = UDim2.new(1, -buttonWidth - 10, 0, yPosition),
+                    Size = UDim2.new(0, buttonWidth, 0, 21 * mobileScaleFactor), Parent = groupObj.mainFrame
+                })
+                makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = multiDropdownObj.buttonFrame})
+                
+                local dropdownStrokeThing = makeThingExist("UIStroke", {Color = Color3.fromRGB(44, 44, 44), Parent = multiDropdownObj.buttonFrame})
+                
+                multiDropdownObj.selectedLabelText = makeThingExist("TextLabel", {
+                    FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
+                    TextColor3 = Color3.fromRGB(84, 84, 84), Text = displayText, BackgroundTransparency = 1,
+                    Position = UDim2.new(0, 8, 0, 0), TextSize = 12 * mobileScaleFactor,
+                    Size = UDim2.new(1, -28 * mobileScaleFactor, 1, 0), TextXAlignment = Enum.TextXAlignment.Left,
+                    TextTruncate = Enum.TextTruncate.AtEnd, Parent = multiDropdownObj.buttonFrame
+                })
+                
+                multiDropdownObj.arrowImg = makeThingExist("ImageLabel", {
+                    ImageColor3 = Color3.fromRGB(80, 80, 80), Image = "rbxassetid://111626678408582", BackgroundTransparency = 1,
+                    Position = UDim2.new(1, -20 * mobileScaleFactor, 0.5, -7 * mobileScaleFactor),
+                    Size = UDim2.new(0, 14 * mobileScaleFactor, 0, 14 * mobileScaleFactor), Parent = multiDropdownObj.buttonFrame
+                })
+                
+                multiDropdownObj.optionHolderFrame = makeThingExist("Frame", {
+                    BackgroundColor3 = Color3.fromRGB(16, 16, 16), Size = UDim2.new(0, 140 * mobileScaleFactor, 0, 0),
+                    ClipsDescendants = true, Visible = false, ZIndex = 9999, Parent = groupObj.Library.dropdownHolderRef
+                })
+                makeThingExist("UICorner", {CornerRadius = UDim.new(0, 6), Parent = multiDropdownObj.optionHolderFrame})
+                makeThingExist("UIStroke", {Color = Color3.fromRGB(40, 40, 40), Parent = multiDropdownObj.optionHolderFrame})
+                
+                makeThingExist("TextLabel", {
+                    FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
+                    TextColor3 = Color3.new(1, 1, 1), Text = multiDropdownConfig.Name, BackgroundTransparency = 1,
+                    Position = UDim2.new(0, 12, 0, 8 * mobileScaleFactor), TextSize = 14 * mobileScaleFactor,
+                    Size = UDim2.new(1, -24, 0, 20 * mobileScaleFactor), TextXAlignment = Enum.TextXAlignment.Left,
+                    ZIndex = 10000, Parent = multiDropdownObj.optionHolderFrame
+                })
+                
+                multiDropdownObj.optionContainerFrame = makeThingExist("Frame", {
+                    BackgroundTransparency = 1, Position = UDim2.new(0, 0, 0, 30 * mobileScaleFactor),
+                    Size = UDim2.new(1, 0, 0, 0), ZIndex = 10000, Parent = multiDropdownObj.optionHolderFrame
+                })
+
+                local function createMultiOptionsYay()
+                    for _, child in pairs(multiDropdownObj.optionContainerFrame:GetChildren()) do
+                        if child:IsA("Frame") or child:IsA("TextButton") then child:Destroy() end
+                    end
+                    local optY = 0
+                    for _, option in ipairs(multiDropdownConfig.Options) do
+                        local isSelected = multiDropdownObj.selectedValues[option] == true
+                        
+                        local optionFrame = makeThingExist("Frame", {
+                            BackgroundTransparency = 1, Position = UDim2.new(0, 0, 0, optY),
+                            Size = UDim2.new(1, 0, 0, 22 * mobileScaleFactor), ZIndex = 10001,
+                            Parent = multiDropdownObj.optionContainerFrame
+                        })
+                        
+                        local checkboxFrame = makeThingExist("Frame", {
+                            BackgroundColor3 = isSelected and groupObj.Library.config.AccentColor or Color3.fromRGB(32, 32, 32),
+                            Position = UDim2.new(0, 12, 0.5, -8 * mobileScaleFactor),
+                            Size = UDim2.new(0, 16 * mobileScaleFactor, 0, 16 * mobileScaleFactor),
+                            ZIndex = 10002, Parent = optionFrame
+                        })
+                        makeThingExist("UICorner", {CornerRadius = UDim.new(0, 4), Parent = checkboxFrame})
+                        
+                        local checkmarkImg = makeThingExist("ImageLabel", {
+                            Image = "rbxassetid://10709790644", ImageColor3 = Color3.new(1, 1, 1),
+                            ImageTransparency = isSelected and 0 or 1, BackgroundTransparency = 1,
+                            Position = UDim2.new(0.5, 0, 0.5, 0), AnchorPoint = Vector2.new(0.5, 0.5),
+                            Size = UDim2.new(0, 12 * mobileScaleFactor, 0, 12 * mobileScaleFactor),
+                            ZIndex = 10003, Parent = checkboxFrame
+                        })
+                        
+                        local optionLabelText = makeThingExist("TextLabel", {
+                            FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
+                            TextColor3 = isSelected and groupObj.Library.config.AccentColor or Color3.fromRGB(124, 124, 124),
+                            Text = option, BackgroundTransparency = 1, Position = UDim2.new(0, 34, 0, 0),
+                            TextSize = 14 * mobileScaleFactor, Size = UDim2.new(1, -46, 1, 0),
+                            TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 10002, Parent = optionFrame
+                        })
+                        
+                        local optionClickButton = makeThingExist("TextButton", {
+                            Text = "", BackgroundTransparency = 1, Size = UDim2.new(1, 0, 1, 0),
+                            ZIndex = 10004, Parent = optionFrame
+                        })
+                        
+                        optionClickButton.MouseButton1Click:Connect(function()
+                            multiDropdownObj.selectedValues[option] = not multiDropdownObj.selectedValues[option]
+                            local nowSelected = multiDropdownObj.selectedValues[option]
+                            
+                            smoothMoveGoWoosh(checkboxFrame, {BackgroundColor3 = nowSelected and groupObj.Library.config.AccentColor or Color3.fromRGB(32, 32, 32)}, 0.15)
+                            smoothMoveGoWoosh(checkmarkImg, {ImageTransparency = nowSelected and 0 or 1}, 0.15)
+                            smoothMoveGoWoosh(optionLabelText, {TextColor3 = nowSelected and groupObj.Library.config.AccentColor or Color3.fromRGB(124, 124, 124)}, 0.15)
+                            
+                            local newDisplayText = getDisplayText()
+                            multiDropdownObj.selectedLabelText.Text = newDisplayText
+                            local newWidth = math.max(85 * mobileScaleFactor, howWideIsThisText(newDisplayText, 12 * mobileScaleFactor) + 35 * mobileScaleFactor)
+                            smoothMoveGoWoosh(multiDropdownObj.buttonFrame, {Size = UDim2.new(0, newWidth, 0, 21 * mobileScaleFactor), Position = UDim2.new(1, -newWidth - 10, 0, yPosition)}, 0.15)
+                            
+                            multiDropdownConfig.Callback(getSelectedArray())
+                        end)
+                        
+                        optionClickButton.MouseEnter:Connect(function()
+                            if not multiDropdownObj.selectedValues[option] then
+                                smoothMoveGoWoosh(optionLabelText, {TextColor3 = Color3.fromRGB(180, 180, 180)}, 0.15)
+                                smoothMoveGoWoosh(checkboxFrame, {BackgroundColor3 = Color3.fromRGB(48, 48, 48)}, 0.15)
+                            end
+                        end)
+                        optionClickButton.MouseLeave:Connect(function()
+                            if not multiDropdownObj.selectedValues[option] then
+                                smoothMoveGoWoosh(optionLabelText, {TextColor3 = Color3.fromRGB(124, 124, 124)}, 0.15)
+                                smoothMoveGoWoosh(checkboxFrame, {BackgroundColor3 = Color3.fromRGB(32, 32, 32)}, 0.15)
+                            end
+                        end)
+                        
+                        optY = optY + 24 * mobileScaleFactor
+                    end
+                end
+                createMultiOptionsYay()
+                
+                local dropdownClickButton = makeThingExist("TextButton", {Text = "", BackgroundTransparency = 1, Size = UDim2.new(1, 0, 1, 0), Parent = multiDropdownObj.buttonFrame})
+                
+                local function updateDropdownPositionYay()
+                    local buttonAbsPos = multiDropdownObj.buttonFrame.AbsolutePosition
+                    local buttonAbsSize = multiDropdownObj.buttonFrame.AbsoluteSize
+                    multiDropdownObj.optionHolderFrame.Position = UDim2.new(0, buttonAbsPos.X, 0, buttonAbsPos.Y + buttonAbsSize.Y + 5)
+                end
+                
+                dropdownClickButton.MouseButton1Click:Connect(function()
+                    multiDropdownObj.isOpen = not multiDropdownObj.isOpen
+                    if multiDropdownObj.isOpen then
+                        updateDropdownPositionYay()
+                        multiDropdownObj.optionHolderFrame.Visible = true
+                        local height = (38 + (#multiDropdownConfig.Options * 24)) * mobileScaleFactor
+                        smoothMoveGoWoosh(multiDropdownObj.optionHolderFrame, {Size = UDim2.new(0, 140 * mobileScaleFactor, 0, height)}, 0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+                        smoothMoveGoWoosh(multiDropdownObj.arrowImg, {Rotation = 180}, 0.2)
+                    else
+                        smoothMoveGoWoosh(multiDropdownObj.optionHolderFrame, {Size = UDim2.new(0, 140 * mobileScaleFactor, 0, 0)}, 0.2)
+                        smoothMoveGoWoosh(multiDropdownObj.arrowImg, {Rotation = 0}, 0.2)
+                        task.delay(0.2, function() if multiDropdownObj.optionHolderFrame.Parent then multiDropdownObj.optionHolderFrame.Visible = false end end)
+                    end
+                end)
+                
+                dropdownClickButton.MouseEnter:Connect(function()
+                    smoothMoveGoWoosh(multiDropdownObj.buttonFrame, {BackgroundColor3 = Color3.fromRGB(48, 48, 48)}, 0.2)
+                    smoothMoveGoWoosh(dropdownStrokeThing, {Color = Color3.fromRGB(83, 83, 83)}, 0.2)
+                end)
+                dropdownClickButton.MouseLeave:Connect(function()
+                    if not multiDropdownObj.isOpen then
+                        smoothMoveGoWoosh(multiDropdownObj.buttonFrame, {BackgroundColor3 = Color3.fromRGB(32, 32, 32)}, 0.2)
+                        smoothMoveGoWoosh(dropdownStrokeThing, {Color = Color3.fromRGB(44, 44, 44)}, 0.2)
+                    end
+                end)
+                
+                function multiDropdownObj:Set(values)
+                    multiDropdownObj.selectedValues = {}
+                    for _, v in ipairs(values) do multiDropdownObj.selectedValues[v] = true end
+                    multiDropdownObj.selectedLabelText.Text = getDisplayText()
+                    createMultiOptionsYay()
+                    multiDropdownConfig.Callback(getSelectedArray())
+                end
+                
+                function multiDropdownObj:Get() return getSelectedArray() end
+                
+                if #multiDropdownConfig.Default > 0 then multiDropdownConfig.Callback(getSelectedArray()) end
+                groupObj.elementYPos = groupObj.elementYPos + 28 * mobileScaleFactor
+                updateGroupSizeYay()
+                table.insert(groupObj.elementsInGroup, multiDropdownObj)
+                return multiDropdownObj
+            end
+
+            function groupObj:AddDivider()
+                local yPosition = groupObj.elementYPos
+                local dividerFrame = makeThingExist("Frame", {
+                    BackgroundColor3 = Color3.fromRGB(36, 36, 36),
+                    Position = UDim2.new(0, 10, 0, yPosition + 4 * mobileScaleFactor),
+                    Size = UDim2.new(0.92, 0, 0, 1), Parent = groupObj.mainFrame
+                })
+                makeThingExist("UIGradient", {
+                    Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(108, 108, 108)), ColorSequenceKeypoint.new(0.514, Color3.new(1, 1, 1)), ColorSequenceKeypoint.new(1, Color3.fromRGB(108, 108, 108))}),
+                    Parent = dividerFrame
+                })
+                groupObj.elementYPos = groupObj.elementYPos + 12 * mobileScaleFactor
+                updateGroupSizeYay()
+                return dividerFrame
+            end
+            
+            function groupObj:AddLabel(labelConfig)
+                labelConfig = labelConfig or {}
+                labelConfig.Text = labelConfig.Text or "Label"
+                local yPosition = groupObj.elementYPos
+                local labelText = makeThingExist("TextLabel", {
+                    FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
+                    TextColor3 = Color3.fromRGB(124, 124, 124), Text = labelConfig.Text, BackgroundTransparency = 1,
+                    Position = UDim2.new(0, 10, 0, yPosition), TextSize = 14 * mobileScaleFactor,
+                    Size = UDim2.new(0.92, 0, 0, 20 * mobileScaleFactor), TextXAlignment = Enum.TextXAlignment.Left,
+                    Parent = groupObj.mainFrame
+                })
+                groupObj.elementYPos = groupObj.elementYPos + 24 * mobileScaleFactor
+                updateGroupSizeYay()
+                return labelText
+            end
+            
+            updateGroupSizeYay()
+            tabObj.groupPositions[groupConfig.Side] = yPosStart + groupObj.mainFrame.Size.Y.Offset + 15 * mobileScaleFactor
+            table.insert(tabObj.groupsInTab, groupObj)
+            return groupObj
+        end
+        
+        table.insert(sectionObj.tabsInSection, tabObj)
+        table.insert(sectionObj.Library.tabsGoWoosh, tabObj)
+        
+        if #sectionObj.Library.tabsGoWoosh == 1 then tabObj:Activate() end
+        
+        task.defer(function()
+            local tabsHeight = sectionObj.tabLayoutThing.AbsoluteContentSize.Y
+            sectionObj.tabHolderFrame.Size = UDim2.new(0, 146 * mobileScaleFactor, 0, tabsHeight)
+            sectionObj.containerFrame.Size = UDim2.new(0, 158 * mobileScaleFactor, 0, 32 * mobileScaleFactor + tabsHeight + 9)
+        end)
+        
+        return tabObj
+    end
+    
+    table.insert(self.sectionsAreAwesome, sectionObj)
+    return sectionObj
+end
+
+function superMegaAwesomeLibrary:SetAccentColor(color)
+    self.config.AccentColor = color
+    if self.mobileToggleIcon then self.mobileToggleIcon.ImageColor3 = color end
+end
+
+function superMegaAwesomeLibrary:Destroy()
+    if self.screenGuiYay and self.screenGuiYay.Parent then self.screenGuiYay:Destroy() end
+end
+
+return superMegaAwesomeLibrary
