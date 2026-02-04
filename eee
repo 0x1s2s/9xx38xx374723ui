@@ -474,7 +474,7 @@ function superMegaAwesomeLibrary:CreateMainFrameYay()
         BackgroundTransparency = 1, Position = UDim2.new(0, 17, 0, 75 * mobileScaleFactor),
         Size = UDim2.new(0, 162 * mobileScaleFactor, 0, 404 * mobileScaleFactor),
         ScrollBarThickness = 0, CanvasSize = UDim2.new(0, 0, 0, 0),
-        AutomaticCanvasSize = Enum.AutomaticSize.Y, ClipsDescendants = false, Parent = self.mainFrameYay
+        AutomaticCanvasSize = Enum.AutomaticSize.Y, ClipsDescendants = true, Parent = self.mainFrameYay
     })
     
     makeThingExist("UIPadding", {PaddingLeft = UDim.new(0, 2), PaddingRight = UDim.new(0, 2), PaddingTop = UDim.new(0, 2), Parent = self.sectionHolderScroll})
@@ -601,7 +601,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
     
     sectionObj.tabHolderFrame = makeThingExist("Frame", {
         BackgroundTransparency = 1, Position = UDim2.new(0, 11, 0, 39 * mobileScaleFactor),
-        Size = UDim2.new(0, 146 * mobileScaleFactor, 0, 0), Parent = sectionObj.containerFrame
+        Size = UDim2.new(0, 146 * mobileScaleFactor, 0, 0), ClipsDescendants = true, Parent = sectionObj.containerFrame
     })
     
     sectionObj.tabLayoutThing = makeThingExist("UIListLayout", {Padding = UDim.new(0, 5), SortOrder = Enum.SortOrder.LayoutOrder, Parent = sectionObj.tabHolderFrame})
@@ -641,7 +641,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
         
         tabObj.buttonFrame = makeThingExist("Frame", {
             BackgroundColor3 = sectionObj.Library.config.AccentColor, BackgroundTransparency = 1,
-            Size = UDim2.new(0, 136 * mobileScaleFactor, 0, 28 * mobileScaleFactor), Parent = sectionObj.tabHolderFrame
+            Size = UDim2.new(0, 136 * mobileScaleFactor, 0, 28 * mobileScaleFactor), ClipsDescendants = true, Parent = sectionObj.tabHolderFrame
         })
         makeThingExist("UICorner", {CornerRadius = UDim.new(0, 7), Parent = tabObj.buttonFrame})
         
@@ -654,10 +654,10 @@ function superMegaAwesomeLibrary:CreateSection(config)
         tabObj.nameLabel = makeThingExist("TextLabel", {
             FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
             TextColor3 = Color3.fromRGB(89, 89, 89), Text = tabConfig.Name, BackgroundTransparency = 1,
-            Position = UDim2.new(0, 30, 0.5, -8 * mobileScaleFactor), TextSize = 15 * mobileScaleFactor,
-            Size = UDim2.new(0, 96 * mobileScaleFactor, 0, 16 * mobileScaleFactor),
+            Position = UDim2.new(0, 28, 0.5, -8 * mobileScaleFactor), TextSize = 14 * mobileScaleFactor,
+            Size = UDim2.new(0, 100 * mobileScaleFactor, 0, 16 * mobileScaleFactor),
             TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd,
-            Parent = tabObj.buttonFrame
+            ClipsDescendants = true, Parent = tabObj.buttonFrame
         })
         
         local tabClickButton = makeThingExist("TextButton", {Text = "", BackgroundTransparency = 1, Size = UDim2.new(1, 0, 1, 0), Parent = tabObj.buttonFrame})
