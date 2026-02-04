@@ -654,8 +654,8 @@ function superMegaAwesomeLibrary:CreateSection(config)
         tabObj.nameLabel = makeThingExist("TextLabel", {
             FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
             TextColor3 = Color3.fromRGB(89, 89, 89), Text = tabConfig.Name, BackgroundTransparency = 1,
-            Position = UDim2.new(0, 28, 0.5, -8 * mobileScaleFactor), TextSize = 14 * mobileScaleFactor,
-            Size = UDim2.new(0, 100 * mobileScaleFactor, 0, 16 * mobileScaleFactor),
+            Position = UDim2.new(0, 28, 0.5, -8 * mobileScaleFactor), TextSize = 13 * mobileScaleFactor,
+            Size = UDim2.new(0, 105 * mobileScaleFactor, 0, 16 * mobileScaleFactor),
             TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd,
             ClipsDescendants = true, Parent = tabObj.buttonFrame
         })
@@ -1180,9 +1180,9 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 dropdownObj.labelText = makeThingExist("TextLabel", {
                     FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
                     TextColor3 = Color3.fromRGB(124, 124, 124), Text = dropdownConfig.Name, BackgroundTransparency = 1,
-                    Position = UDim2.new(0, 10, 0, yPosition), TextSize = 14 * mobileScaleFactor,
-                    Size = UDim2.new(0, 100 * mobileScaleFactor, 0, 20 * mobileScaleFactor),
-                    TextXAlignment = Enum.TextXAlignment.Left, Parent = groupObj.mainFrame
+                    Position = UDim2.new(0, 10, 0, yPosition), TextSize = 13 * mobileScaleFactor,
+                    Size = UDim2.new(0, 130 * mobileScaleFactor, 0, 20 * mobileScaleFactor),
+                    TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd, Parent = groupObj.mainFrame
                 })
                 
                 local displayText = dropdownObj.value or "None"
