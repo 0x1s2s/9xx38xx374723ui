@@ -655,8 +655,9 @@ function superMegaAwesomeLibrary:CreateSection(config)
             FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
             TextColor3 = Color3.fromRGB(89, 89, 89), Text = tabConfig.Name, BackgroundTransparency = 1,
             Position = UDim2.new(0, 30, 0.5, -8 * mobileScaleFactor), TextSize = 15 * mobileScaleFactor,
-            Size = UDim2.new(0, 100 * mobileScaleFactor, 0, 16 * mobileScaleFactor),
-            TextXAlignment = Enum.TextXAlignment.Left, Parent = tabObj.buttonFrame
+            Size = UDim2.new(0, 96 * mobileScaleFactor, 0, 16 * mobileScaleFactor),
+            TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd,
+            Parent = tabObj.buttonFrame
         })
         
         local tabClickButton = makeThingExist("TextButton", {Text = "", BackgroundTransparency = 1, Size = UDim2.new(1, 0, 1, 0), Parent = tabObj.buttonFrame})
@@ -741,8 +742,8 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
                 TextColor3 = Color3.new(1, 1, 1), Text = groupConfig.Name, BackgroundTransparency = 1,
                 Position = UDim2.new(0, 32, 0, 8 * mobileScaleFactor), TextSize = 15 * mobileScaleFactor,
-                Size = UDim2.new(0, 100, 0, 16 * mobileScaleFactor), TextXAlignment = Enum.TextXAlignment.Left,
-                Parent = groupObj.mainFrame
+                Size = UDim2.new(0, 215 * mobileScaleFactor, 0, 16 * mobileScaleFactor), TextXAlignment = Enum.TextXAlignment.Left,
+                TextTruncate = Enum.TextTruncate.AtEnd, Parent = groupObj.mainFrame
             })
             
             local function updateGroupSizeYay()
@@ -767,8 +768,9 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
                     TextColor3 = Color3.fromRGB(124, 124, 124), Text = toggleConfig.Name, BackgroundTransparency = 1,
                     Position = UDim2.new(0, 10, 0, yPosition), TextSize = 14 * mobileScaleFactor,
-                    Size = UDim2.new(0, 150 * mobileScaleFactor, 0, 20 * mobileScaleFactor),
-                    TextXAlignment = Enum.TextXAlignment.Left, Parent = groupObj.mainFrame
+                    Size = UDim2.new(0, 195 * mobileScaleFactor, 0, 20 * mobileScaleFactor),
+                    TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd,
+                    Parent = groupObj.mainFrame
                 })
                 
                 toggleObj.switchFrame = makeThingExist("Frame", {
@@ -826,8 +828,9 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
                     TextColor3 = Color3.fromRGB(124, 124, 124), Text = sliderConfig.Name, BackgroundTransparency = 1,
                     Position = UDim2.new(0, 10, 0, yPosition), TextSize = 14 * mobileScaleFactor,
-                    Size = UDim2.new(0, 120 * mobileScaleFactor, 0, 20 * mobileScaleFactor),
-                    TextXAlignment = Enum.TextXAlignment.Left, Parent = groupObj.mainFrame
+                    Size = UDim2.new(0, 155 * mobileScaleFactor, 0, 20 * mobileScaleFactor),
+                    TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd,
+                    Parent = groupObj.mainFrame
                 })
                 
                 sliderObj.backgroundFrame = makeThingExist("Frame", {
@@ -925,7 +928,8 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     Text = buttonConfig.Name .. (buttonObj.isLocked and " (locked)" or ""), BackgroundTransparency = 1,
                     Position = UDim2.new(0, textXPos * mobileScaleFactor, 0, 0), TextSize = 14 * mobileScaleFactor,
                     Size = UDim2.new(1, -textXPos * mobileScaleFactor - 10, 1, 0),
-                    TextXAlignment = Enum.TextXAlignment.Left, Parent = buttonObj.mainFrame
+                    TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd,
+                    Parent = buttonObj.mainFrame
                 })
                 
                 local buttonClickButton = makeThingExist("TextButton", {Text = "", BackgroundTransparency = 1, Size = UDim2.new(1, 0, 1, 0), Parent = buttonObj.mainFrame})
@@ -955,8 +959,9 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
                     TextColor3 = Color3.fromRGB(124, 124, 124), Text = keybindConfig.Name, BackgroundTransparency = 1,
                     Position = UDim2.new(0, 10, 0, yPosition), TextSize = 14 * mobileScaleFactor,
-                    Size = UDim2.new(0, 120 * mobileScaleFactor, 0, 20 * mobileScaleFactor),
-                    TextXAlignment = Enum.TextXAlignment.Left, Parent = groupObj.mainFrame
+                    Size = UDim2.new(0, 145 * mobileScaleFactor, 0, 20 * mobileScaleFactor),
+                    TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd,
+                    Parent = groupObj.mainFrame
                 })
                 
                 local keyText = keybindObj.value == Enum.KeyCode.Unknown and "None" or keybindObj.value.Name
@@ -1055,8 +1060,9 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
                     TextColor3 = Color3.fromRGB(124, 124, 124), Text = keybindToggleConfig.Name, BackgroundTransparency = 1,
                     Position = UDim2.new(0, 10, 0, yPosition), TextSize = 14 * mobileScaleFactor,
-                    Size = UDim2.new(0, 100 * mobileScaleFactor, 0, 20 * mobileScaleFactor),
-                    TextXAlignment = Enum.TextXAlignment.Left, Parent = groupObj.mainFrame
+                    Size = UDim2.new(0, 115 * mobileScaleFactor, 0, 20 * mobileScaleFactor),
+                    TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd,
+                    Parent = groupObj.mainFrame
                 })
                 
                 local keyText = keybindToggleObj.keyValue == Enum.KeyCode.Unknown and "None" or keybindToggleObj.keyValue.Name
