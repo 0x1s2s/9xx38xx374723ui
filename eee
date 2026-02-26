@@ -686,6 +686,15 @@ function superMegaAwesomeLibrary:CreateSection(config)
         
         function tabObj:Deactivate()
             tabObj.isActive = false
+            for _, group in ipairs(tabObj.groupsInTab) do
+                for _, element in ipairs(group.elementsInGroup) do
+                    if type(element) == "table" and type(element.Close) == "function" then
+                        pcall(function()
+                            element:Close()
+                        end)
+                    end
+                end
+            end
             tabObj.contentScroll.Visible = false
             smoothMoveGoWoosh(tabObj.buttonFrame, {BackgroundTransparency = 1}, 0.2)
             smoothMoveGoWoosh(tabObj.iconImg, {ImageColor3 = Color3.fromRGB(89, 89, 89)}, 0.2)
@@ -1238,6 +1247,28 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 })
                 
                 local maxDropdownHeight = 200 * mobileScaleFactor
+                local dropdownPositionUpdateConn = nil
+
+                local function closeDropdown(isInstant)
+                    dropdownObj.isOpen = false
+                    if dropdownPositionUpdateConn then
+                        dropdownPositionUpdateConn:Disconnect()
+                        dropdownPositionUpdateConn = nil
+                    end
+                    if isInstant then
+                        dropdownObj.optionHolderFrame.Size = UDim2.new(0, 140 * mobileScaleFactor, 0, 0)
+                        dropdownObj.optionHolderFrame.Visible = false
+                        dropdownObj.arrowImg.Rotation = 0
+                        return
+                    end
+                    smoothMoveGoWoosh(dropdownObj.optionHolderFrame, {Size = UDim2.new(0, 140 * mobileScaleFactor, 0, 0)}, 0.2)
+                    smoothMoveGoWoosh(dropdownObj.arrowImg, {Rotation = 0}, 0.2)
+                    task.delay(0.2, function()
+                        if dropdownObj.optionHolderFrame.Parent and not dropdownObj.isOpen then
+                            dropdownObj.optionHolderFrame.Visible = false
+                        end
+                    end)
+                end
                 
                 local function createOptionsYay()
                     for _, child in pairs(dropdownObj.optionContainerFrame:GetChildren()) do
@@ -1260,10 +1291,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                         })
                         optionClickButton.MouseButton1Click:Connect(function()
                             dropdownObj.value = option
-                            dropdownObj.isOpen = false
-                            smoothMoveGoWoosh(dropdownObj.optionHolderFrame, {Size = UDim2.new(0, 140 * mobileScaleFactor, 0, 0)}, 0.2)
-                            smoothMoveGoWoosh(dropdownObj.arrowImg, {Rotation = 0}, 0.2)
-                            task.delay(0.2, function() if dropdownObj.optionHolderFrame.Parent then dropdownObj.optionHolderFrame.Visible = false end end)
+                            closeDropdown(false)
                             dropdownObj.selectedLabelText.Text = option
                             local newWidth = math.max(70 * mobileScaleFactor, howWideIsThisText(option, 12 * mobileScaleFactor) + 30 * mobileScaleFactor)
                             smoothMoveGoWoosh(dropdownObj.buttonFrame, {Size = UDim2.new(0, newWidth, 0, 21 * mobileScaleFactor), Position = UDim2.new(1, -newWidth - 10, 0, yPosition)}, 0.15)
@@ -1287,9 +1315,6 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     dropdownObj.optionHolderFrame.Position = UDim2.new(0, buttonAbsPos.X, 0, buttonAbsPos.Y + buttonAbsSize.Y + 5)
                 end
                 
-                -- Continuous position update connection for when UI is dragged
-                local dropdownPositionUpdateConn = nil
-                
                 dropdownClickButton.MouseButton1Click:Connect(function()
                     dropdownObj.isOpen = not dropdownObj.isOpen
                     if dropdownObj.isOpen then
@@ -1309,10 +1334,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                             end
                         end)
                     else
-                        smoothMoveGoWoosh(dropdownObj.optionHolderFrame, {Size = UDim2.new(0, 140 * mobileScaleFactor, 0, 0)}, 0.2)
-                        smoothMoveGoWoosh(dropdownObj.arrowImg, {Rotation = 0}, 0.2)
-                        task.delay(0.2, function() if dropdownObj.optionHolderFrame.Parent then dropdownObj.optionHolderFrame.Visible = false end end)
-                        if dropdownPositionUpdateConn then dropdownPositionUpdateConn:Disconnect() end
+                        closeDropdown(false)
                     end
                 end)
                 
@@ -1340,6 +1362,10 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 function dropdownObj:UpdateOptions(newOptions)
                     dropdownConfig.Options = newOptions
                     createOptionsYay()
+                end
+
+                function dropdownObj:Close()
+                    closeDropdown(true)
                 end
                 
                 groupObj.elementYPos = groupObj.elementYPos + 28 * mobileScaleFactor
@@ -1441,6 +1467,28 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 })
                 
                 local maxMultiDropdownHeight = 220 * mobileScaleFactor
+                local multiDropdownPositionConn = nil
+
+                local function closeMultiDropdown(isInstant)
+                    multiDropdownObj.isOpen = false
+                    if multiDropdownPositionConn then
+                        multiDropdownPositionConn:Disconnect()
+                        multiDropdownPositionConn = nil
+                    end
+                    if isInstant then
+                        multiDropdownObj.optionHolderFrame.Size = UDim2.new(0, 160 * mobileScaleFactor, 0, 0)
+                        multiDropdownObj.optionHolderFrame.Visible = false
+                        multiDropdownObj.arrowImg.Rotation = 0
+                        return
+                    end
+                    smoothMoveGoWoosh(multiDropdownObj.optionHolderFrame, {Size = UDim2.new(0, 160 * mobileScaleFactor, 0, 0)}, 0.2)
+                    smoothMoveGoWoosh(multiDropdownObj.arrowImg, {Rotation = 0}, 0.2)
+                    task.delay(0.2, function()
+                        if multiDropdownObj.optionHolderFrame.Parent and not multiDropdownObj.isOpen then
+                            multiDropdownObj.optionHolderFrame.Visible = false
+                        end
+                    end)
+                end
 
                 local function createMultiOptionsYay()
                     for _, child in pairs(multiDropdownObj.optionContainerFrame:GetChildren()) do
@@ -1529,9 +1577,6 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     multiDropdownObj.optionHolderFrame.Position = UDim2.new(0, buttonAbsPos.X, 0, buttonAbsPos.Y + buttonAbsSize.Y + 5)
                 end
                 
-                -- Continuous position update connection for when UI is dragged
-                local multiDropdownPositionConn = nil
-                
                 dropdownClickButton.MouseButton1Click:Connect(function()
                     multiDropdownObj.isOpen = not multiDropdownObj.isOpen
                     if multiDropdownObj.isOpen then
@@ -1551,10 +1596,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                             end
                         end)
                     else
-                        smoothMoveGoWoosh(multiDropdownObj.optionHolderFrame, {Size = UDim2.new(0, 160 * mobileScaleFactor, 0, 0)}, 0.2)
-                        smoothMoveGoWoosh(multiDropdownObj.arrowImg, {Rotation = 0}, 0.2)
-                        task.delay(0.2, function() if multiDropdownObj.optionHolderFrame.Parent then multiDropdownObj.optionHolderFrame.Visible = false end end)
-                        if multiDropdownPositionConn then multiDropdownPositionConn:Disconnect() end
+                        closeMultiDropdown(false)
                     end
                 end)
                 
@@ -1583,6 +1625,10 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 end
                 
                 function multiDropdownObj:Get() return getSelectedArray() end
+
+                function multiDropdownObj:Close()
+                    closeMultiDropdown(true)
+                end
                 
                 if #multiDropdownConfig.Default > 0 then multiDropdownConfig.Callback(getSelectedArray()) end
                 groupObj.elementYPos = groupObj.elementYPos + 28 * mobileScaleFactor
@@ -1917,6 +1963,27 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 })
                 
                 local colorPickerPositionConn = nil
+                local function closeColorPicker(isInstant)
+                    colorPickerObj.isOpen = false
+                    if colorPickerPositionConn then
+                        colorPickerPositionConn:Disconnect()
+                        colorPickerPositionConn = nil
+                    end
+                    if isInstant then
+                        colorPickerObj.pickerHolder.Size = UDim2.new(0, 200 * mobileScaleFactor, 0, 0)
+                        colorPickerObj.pickerHolder.Visible = false
+                        return
+                    end
+                    smoothMoveGoWoosh(colorPickerObj.pickerHolder, {
+                        Size = UDim2.new(0, 200 * mobileScaleFactor, 0, 0)
+                    }, 0.15)
+                    task.delay(0.15, function()
+                        if colorPickerObj.pickerHolder.Parent and not colorPickerObj.isOpen then
+                            colorPickerObj.pickerHolder.Visible = false
+                        end
+                    end)
+                end
+
                 local function updatePickerPosition()
                     local absPos = colorPickerObj.colorPreview.AbsolutePosition
                     local absSize = colorPickerObj.colorPreview.AbsoluteSize
@@ -1937,13 +2004,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                             else colorPickerPositionConn:Disconnect() end
                         end)
                     else
-                        smoothMoveGoWoosh(colorPickerObj.pickerHolder, {
-                            Size = UDim2.new(0, 200 * mobileScaleFactor, 0, 0)
-                        }, 0.15)
-                        task.delay(0.15, function()
-                            if colorPickerObj.pickerHolder.Parent then colorPickerObj.pickerHolder.Visible = false end
-                        end)
-                        if colorPickerPositionConn then colorPickerPositionConn:Disconnect() end
+                        closeColorPicker(false)
                     end
                 end)
                 
@@ -1958,6 +2019,10 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 end
                 
                 function colorPickerObj:Get() return colorPickerObj.value end
+
+                function colorPickerObj:Close()
+                    closeColorPicker(true)
+                end
                 
                 colorPickerConfig.Callback(colorPickerConfig.Default)
                 groupObj.elementYPos = groupObj.elementYPos + 28 * mobileScaleFactor
