@@ -8,6 +8,7 @@ local textServiceBeLikeText = v0rtexdIsTheBestDev(game:GetService("TextService")
 local coreGuiMoreLikeBoreGui = v0rtexdIsTheBestDev(game:GetService("CoreGui"))
 local guiServiceIsCool = v0rtexdIsTheBestDev(game:GetService("GuiService"))
 local httpServiceNoCap = v0rtexdIsTheBestDev(game:GetService("HttpService"))
+local lightingServiceLooksClean = v0rtexdIsTheBestDev(game:GetService("Lighting"))
 
 local superMegaAwesomeLibrary = {}
 superMegaAwesomeLibrary.__index = superMegaAwesomeLibrary
@@ -229,6 +230,25 @@ function superMegaAwesomeLibrary.new(config)
     self._fpsRollingTotal = 0
     self._fpsRollingSize = 60
     self._latestFPSValue = 0
+    self._blurEffectRef = nil
+    self._snowflakes = {}
+    self._snowSpawnAccumulator = 0
+    self._snowMaxFlakes = isMobileUserSadly and 45 or 90
+    self._backgroundFxTime = 0
+    self._uiVisualSettings = {
+        Blur = true,
+        Snow = true,
+        BackgroundEffects = true,
+        TextGradient = true
+    }
+    self._fontPresets = {
+        {Name = "Gotham", Family = "rbxasset://fonts/families/GothamSSm.json", Weight = Enum.FontWeight.SemiBold},
+        {Name = "Montserrat", Family = "rbxasset://fonts/families/Montserrat.json", Weight = Enum.FontWeight.SemiBold},
+        {Name = "Nunito", Family = "rbxasset://fonts/families/Nunito.json", Weight = Enum.FontWeight.SemiBold},
+        {Name = "Source Sans", Family = "rbxasset://fonts/families/SourceSansPro.json", Weight = Enum.FontWeight.SemiBold}
+    }
+    self._fontPresetIndex = 1
+    self._gradientLabels = {}
     
     self:CreateUIBecauseWeNeedIt()
     
@@ -258,6 +278,192 @@ function superMegaAwesomeLibrary:RegisterControl(flag, getter, setter)
         get = getter,
         set = setter
     }
+end
+
+function superMegaAwesomeLibrary:_EnsureBlurEffect()
+    if self._blurEffectRef and self._blurEffectRef.Parent then
+        return self._blurEffectRef
+    end
+    local existingBlur = lightingServiceLooksClean:FindFirstChild("FlowUIBlurEffect")
+    if existingBlur and existingBlur:IsA("BlurEffect") then
+        self._blurEffectRef = existingBlur
+        return existingBlur
+    end
+    self._blurEffectRef = makeThingExist("BlurEffect", {
+        Name = "FlowUIBlurEffect",
+        Size = 0,
+        Enabled = true,
+        Parent = lightingServiceLooksClean
+    })
+    return self._blurEffectRef
+end
+
+function superMegaAwesomeLibrary:_SetBlurActive(active, instant)
+    local blur = self:_EnsureBlurEffect()
+    local shouldEnable = self._uiVisualSettings.Blur and active
+    local targetSize = shouldEnable and (isMobileUserSadly and 14 or 18) or 0
+    if instant then
+        blur.Size = targetSize
+        return
+    end
+    smoothMoveGoWoosh(blur, {Size = targetSize}, 0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+end
+
+function superMegaAwesomeLibrary:_ClearSnowflakes()
+    for i = #self._snowflakes, 1, -1 do
+        local snowObj = self._snowflakes[i]
+        if snowObj and snowObj.instance and snowObj.instance.Parent then
+            snowObj.instance:Destroy()
+        end
+        self._snowflakes[i] = nil
+    end
+end
+
+function superMegaAwesomeLibrary:_SpawnSnowflake()
+    if not self.snowLayerFrame or not self.snowLayerFrame.Parent then
+        return
+    end
+    local viewportSize = self.screenGuiYay.AbsoluteSize
+    local width = math.max(200, math.floor(viewportSize.X))
+    local size = math.random(3, 9) * mobileScaleFactor
+    local startX = math.random(0, width)
+    local flake = makeThingExist("ImageLabel", {
+        BackgroundTransparency = 1,
+        Image = "rbxassetid://3570695787",
+        ImageColor3 = Color3.new(1, 1, 1),
+        ImageTransparency = math.random(12, 42) / 100,
+        Size = UDim2.new(0, size, 0, size),
+        Position = UDim2.new(0, startX, 0, -math.random(6, 80)),
+        ZIndex = 1,
+        Parent = self.snowLayerFrame
+    })
+    table.insert(self._snowflakes, {
+        instance = flake,
+        baseX = startX,
+        fallSpeed = math.random(26, 74) * mobileScaleFactor,
+        driftAmount = math.random(8, 36) * mobileScaleFactor,
+        driftSpeed = math.random(8, 20) / 10,
+        phase = math.random() * math.pi * 2,
+        spin = math.random(-26, 26),
+        yOffset = flake.Position.Y.Offset
+    })
+end
+
+function superMegaAwesomeLibrary:_SetSnowEnabled(enabled)
+    self._uiVisualSettings.Snow = enabled == true
+    if self.snowLayerFrame then
+        self.snowLayerFrame.Visible = self._uiVisualSettings.Snow and self.isToggledOn
+    end
+    if not self._uiVisualSettings.Snow or not self.isToggledOn then
+        self._snowSpawnAccumulator = 0
+        self:_ClearSnowflakes()
+    end
+end
+
+function superMegaAwesomeLibrary:_SetBackgroundEffectsEnabled(enabled)
+    self._uiVisualSettings.BackgroundEffects = enabled == true
+    if self.mainBackgroundEffectsFrame then
+        self.mainBackgroundEffectsFrame.Visible = self._uiVisualSettings.BackgroundEffects
+    end
+end
+
+function superMegaAwesomeLibrary:_SetTextGradientEnabled(enabled)
+    self._uiVisualSettings.TextGradient = enabled == true
+    local accent = self.config.AccentColor
+    for _, label in ipairs(self._gradientLabels) do
+        if label and label.Parent then
+            local gradientObj = label:FindFirstChild("FlowUITextGradient")
+            if self._uiVisualSettings.TextGradient then
+                if not gradientObj then
+                    gradientObj = makeThingExist("UIGradient", {
+                        Name = "FlowUITextGradient",
+                        Rotation = 16,
+                        Parent = label
+                    })
+                end
+                gradientObj.Color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, accent:Lerp(Color3.new(1, 1, 1), 0.2)),
+                    ColorSequenceKeypoint.new(0.55, Color3.new(1, 1, 1)),
+                    ColorSequenceKeypoint.new(1, accent:Lerp(Color3.new(1, 1, 1), 0.35))
+                })
+            elseif gradientObj then
+                gradientObj:Destroy()
+            end
+        end
+    end
+end
+
+function superMegaAwesomeLibrary:ApplyFontPreset(index)
+    if #self._fontPresets == 0 then
+        return
+    end
+    local normalizedIndex = tonumber(index) or (self._fontPresetIndex + 1)
+    if normalizedIndex > #self._fontPresets then
+        normalizedIndex = 1
+    elseif normalizedIndex < 1 then
+        normalizedIndex = #self._fontPresets
+    end
+    self._fontPresetIndex = normalizedIndex
+    local preset = self._fontPresets[self._fontPresetIndex]
+    local okFont, targetFont = pcall(function()
+        return Font.new(preset.Family, preset.Weight or Enum.FontWeight.SemiBold, Enum.FontStyle.Normal)
+    end)
+    if not okFont then
+        targetFont = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold, Enum.FontStyle.Normal)
+    end
+    if self.screenGuiYay and self.screenGuiYay.Parent then
+        for _, obj in ipairs(self.screenGuiYay:GetDescendants()) do
+            if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
+                pcall(function()
+                    obj.FontFace = targetFont
+                end)
+            end
+        end
+    end
+    if self.uiSettingsFontValueLabel then
+        self.uiSettingsFontValueLabel.Text = preset.Name
+    end
+end
+
+function superMegaAwesomeLibrary:_RefreshAccentCore()
+    local accent = self.config.AccentColor
+    if self.mobileToggleIcon then
+        self.mobileToggleIcon.ImageColor3 = accent
+    end
+    if self.mainBackgroundAccentGlow then
+        self.mainBackgroundAccentGlow.ImageColor3 = accent
+    end
+    if self.uiAccentPreviewFrame then
+        self.uiAccentPreviewFrame.BackgroundColor3 = accent
+    end
+    if self.uiSettingsButtonStroke then
+        self.uiSettingsButtonStroke.Color = self.uiSettingsOpen and accent:Lerp(Color3.fromRGB(20, 20, 20), 0.45) or Color3.fromRGB(45, 45, 45)
+    end
+    if self.currentTabYay and self.currentTabYay.buttonFrame then
+        self.currentTabYay.buttonFrame.BackgroundColor3 = accent
+    end
+    self:_SetTextGradientEnabled(self._uiVisualSettings.TextGradient)
+end
+
+function superMegaAwesomeLibrary:_ApplyOpenCloseVisuals(instant)
+    self:_SetBlurActive(self.isToggledOn, instant)
+    if self.backdropDimFrame then
+        local targetTransparency = (self.isToggledOn and self._uiVisualSettings.Blur) and 0.55 or 1
+        if instant then
+            self.backdropDimFrame.BackgroundTransparency = targetTransparency
+        else
+            smoothMoveGoWoosh(self.backdropDimFrame, {
+                BackgroundTransparency = targetTransparency
+            }, 0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+        end
+    end
+    if self.snowLayerFrame then
+        self.snowLayerFrame.Visible = self.isToggledOn and self._uiVisualSettings.Snow
+    end
+    if not self.isToggledOn then
+        self._snowSpawnAccumulator = 0
+        self:_ClearSnowflakes()
+    end
 end
 
 function superMegaAwesomeLibrary:EnableSmoothScrolling(scrollFrame, smoothSpeed)
@@ -416,6 +622,26 @@ function superMegaAwesomeLibrary:CreateUIBecauseWeNeedIt()
     else
         self.screenGuiYay.Parent = theOneAndOnlyPlayer:WaitForChild("PlayerGui")
     end
+
+    self.backdropDimFrame = makeThingExist("Frame", {
+        Name = "BackdropDimForBlur",
+        BackgroundColor3 = Color3.new(0, 0, 0),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        Size = UDim2.new(1, 0, 1, 0),
+        ZIndex = 0,
+        Parent = self.screenGuiYay
+    })
+
+    self.snowLayerFrame = makeThingExist("Frame", {
+        Name = "SnowLayerWhenOpen",
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        Size = UDim2.new(1, 0, 1, 0),
+        ZIndex = 1,
+        ClipsDescendants = true,
+        Parent = self.screenGuiYay
+    })
     
     self.dropdownHolderRef = makeThingExist("Frame", {
         Name = "DropdownHolderBecauseDropdownsNeedHomes",
@@ -429,6 +655,10 @@ function superMegaAwesomeLibrary:CreateUIBecauseWeNeedIt()
     self:CreateMainFrameYay()
     self:CreateNotificationHolderForCoolNotifs()
     self:CreateMobileToggleButton()
+    self:ApplyFontPreset(self._fontPresetIndex)
+    self:_SetTextGradientEnabled(self._uiVisualSettings.TextGradient)
+    self:_SetBackgroundEffectsEnabled(self._uiVisualSettings.BackgroundEffects)
+    self:_ApplyOpenCloseVisuals(true)
     
     self:_TrackConnection(thisInputServiceGoesHard.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
@@ -466,6 +696,47 @@ function superMegaAwesomeLibrary:CreateUIBecauseWeNeedIt()
                 end
             end
         end
+
+        if self._uiVisualSettings.BackgroundEffects and self.mainBackgroundEffectsFrame and self.mainBackgroundEffectsFrame.Visible then
+            self._backgroundFxTime = self._backgroundFxTime + dt
+            if self.mainBackgroundGradient then
+                self.mainBackgroundGradient.Rotation = (self.mainBackgroundGradient.Rotation + dt * 8) % 360
+            end
+            if self.mainBackgroundAccentGlow then
+                local timeNow = self._backgroundFxTime
+                local xPos = 0.5 + math.sin(timeNow * 0.45) * 0.09
+                local yPos = 0.5 + math.cos(timeNow * 0.63) * 0.06
+                self.mainBackgroundAccentGlow.Position = UDim2.new(xPos, 0, yPos, 0)
+                self.mainBackgroundAccentGlow.ImageTransparency = 0.9 - (math.sin(timeNow * 1.6) + 1) * 0.03
+            end
+        end
+
+        if self.isToggledOn and self._uiVisualSettings.Snow and self.snowLayerFrame and self.snowLayerFrame.Visible then
+            self._snowSpawnAccumulator = self._snowSpawnAccumulator + dt
+            local spawnInterval = isMobileUserSadly and 0.1 or 0.06
+            while self._snowSpawnAccumulator >= spawnInterval and #self._snowflakes < self._snowMaxFlakes do
+                self:_SpawnSnowflake()
+                self._snowSpawnAccumulator = self._snowSpawnAccumulator - spawnInterval
+            end
+            local nowTick = os.clock()
+            local viewportHeight = math.max(320, math.floor(self.screenGuiYay.AbsoluteSize.Y))
+            for i = #self._snowflakes, 1, -1 do
+                local flakeData = self._snowflakes[i]
+                local flakeObj = flakeData and flakeData.instance
+                if not flakeObj or not flakeObj.Parent then
+                    table.remove(self._snowflakes, i)
+                else
+                    flakeData.yOffset = flakeData.yOffset + flakeData.fallSpeed * dt
+                    local driftX = math.sin(nowTick * flakeData.driftSpeed + flakeData.phase) * flakeData.driftAmount
+                    flakeObj.Position = UDim2.new(0, flakeData.baseX + driftX, 0, flakeData.yOffset)
+                    flakeObj.Rotation = (flakeObj.Rotation + flakeData.spin * dt) % 360
+                    if flakeData.yOffset > viewportHeight + 24 then
+                        flakeObj:Destroy()
+                        table.remove(self._snowflakes, i)
+                    end
+                end
+            end
+        end
     end))
 end
 
@@ -474,6 +745,7 @@ function superMegaAwesomeLibrary:ToggleUI()
     smoothMoveGoWoosh(self.mainFrameYay, {
         Position = self.isToggledOn and UDim2.new(0.5, -376 * mobileScaleFactor, 0.5, -246 * mobileScaleFactor) or UDim2.new(0.5, -376 * mobileScaleFactor, 1.5, 0)
     }, 0.4, Enum.EasingStyle.Quint, self.isToggledOn and Enum.EasingDirection.Out or Enum.EasingDirection.In)
+    self:_ApplyOpenCloseVisuals(false)
 end
 
 function superMegaAwesomeLibrary:SetToggleButtonVisible(visible)
@@ -604,6 +876,7 @@ function superMegaAwesomeLibrary:CreateWatermarkBecauseWeCool()
         Size = UDim2.new(1, -40, 1, 0), TextXAlignment = Enum.TextXAlignment.Left,
         Parent = self.watermarkFrame
     })
+    table.insert(self._gradientLabels, self.watermarkTextLabel)
     
     makeDraggableCuzWeCan(self.watermarkFrame, nil, self)
     
@@ -636,6 +909,37 @@ function superMegaAwesomeLibrary:CreateMainFrameYay()
     })
     
     makeThingExist("UICorner", {CornerRadius = UDim.new(0, 10), Parent = self.mainFrameYay})
+
+    self.mainBackgroundEffectsFrame = makeThingExist("Frame", {
+        Name = "MainBackgroundEffects",
+        BackgroundColor3 = Color3.fromRGB(18, 18, 18),
+        BackgroundTransparency = 0.45,
+        Size = UDim2.new(1, 0, 1, 0),
+        ClipsDescendants = true,
+        ZIndex = 0,
+        Parent = self.mainFrameYay
+    })
+    self.mainBackgroundGradient = makeThingExist("UIGradient", {
+        Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(10, 10, 10)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(18, 18, 18)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(12, 12, 12))
+        }),
+        Rotation = 210,
+        Parent = self.mainBackgroundEffectsFrame
+    })
+    self.mainBackgroundAccentGlow = makeThingExist("ImageLabel", {
+        Name = "AccentGlow",
+        BackgroundTransparency = 1,
+        Image = "rbxassetid://5028857084",
+        ImageColor3 = self.config.AccentColor,
+        ImageTransparency = 0.9,
+        Size = UDim2.new(1.8, 0, 1.8, 0),
+        Position = UDim2.new(0.5, 0, 0.5, 0),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        ZIndex = 0,
+        Parent = self.mainBackgroundEffectsFrame
+    })
     
     self.dragBarThing = makeThingExist("Frame", {
         BackgroundTransparency = 1, Position = UDim2.new(0, 0, 0, 0),
@@ -653,6 +957,7 @@ function superMegaAwesomeLibrary:CreateMainFrameYay()
         Size = UDim2.new(0, hubNameWidth + 10, 0, 20 * mobileScaleFactor),
         TextXAlignment = Enum.TextXAlignment.Left, Parent = self.mainFrameYay
     })
+    table.insert(self._gradientLabels, self.hubNameLabel)
     
     local playerName = "@" .. theOneAndOnlyPlayer.Name
     self.userNameLabel = makeThingExist("TextLabel", {
@@ -684,6 +989,7 @@ function superMegaAwesomeLibrary:CreateMainFrameYay()
         TextSize = 17 * mobileScaleFactor, Size = UDim2.new(0, 78, 0, 20 * mobileScaleFactor),
         TextXAlignment = Enum.TextXAlignment.Left, Parent = self.mainFrameYay
     })
+    table.insert(self._gradientLabels, self.tabNameLabel)
     
     self.tabDescriptionLabel = makeThingExist("TextLabel", {
         FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
@@ -743,6 +1049,286 @@ function superMegaAwesomeLibrary:CreateMainFrameYay()
         Size = UDim2.new(0, 548 * mobileScaleFactor, 0, 424 * mobileScaleFactor),
         ClipsDescendants = true, Parent = self.mainFrameYay
     })
+
+    local settingsPanelWidth = 185 * mobileScaleFactor
+    local settingsPanelHeight = 188 * mobileScaleFactor
+    self.uiSettingsOpen = false
+
+    self.uiSettingsButtonFrame = makeThingExist("Frame", {
+        BackgroundColor3 = Color3.fromRGB(20, 20, 20),
+        Position = UDim2.new(0, 10, 1, -31 * mobileScaleFactor),
+        Size = UDim2.new(0, 116 * mobileScaleFactor, 0, 22 * mobileScaleFactor),
+        BorderSizePixel = 0,
+        Parent = self.mainFrameYay
+    })
+    makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = self.uiSettingsButtonFrame})
+    self.uiSettingsButtonStroke = makeThingExist("UIStroke", {Color = Color3.fromRGB(45, 45, 45), Parent = self.uiSettingsButtonFrame})
+
+    makeThingExist("ImageLabel", {
+        Image = "rbxassetid://6031280882",
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0, 7, 0.5, -6 * mobileScaleFactor),
+        Size = UDim2.new(0, 12 * mobileScaleFactor, 0, 12 * mobileScaleFactor),
+        ImageColor3 = Color3.fromRGB(165, 165, 165),
+        Parent = self.uiSettingsButtonFrame
+    })
+    makeThingExist("TextLabel", {
+        FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
+        Text = "UI Settings",
+        TextColor3 = Color3.fromRGB(185, 185, 185),
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0, 24 * mobileScaleFactor, 0, 0),
+        Size = UDim2.new(1, -28 * mobileScaleFactor, 1, 0),
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextSize = 12 * mobileScaleFactor,
+        Parent = self.uiSettingsButtonFrame
+    })
+    local settingsToggleButton = makeThingExist("TextButton", {
+        Text = "",
+        BackgroundTransparency = 1,
+        Size = UDim2.new(1, 0, 1, 0),
+        Parent = self.uiSettingsButtonFrame
+    })
+
+    self.uiSettingsPanelFrame = makeThingExist("Frame", {
+        BackgroundColor3 = Color3.fromRGB(15, 15, 15),
+        AnchorPoint = Vector2.new(0, 1),
+        Position = UDim2.new(0, 10, 1, -36 * mobileScaleFactor),
+        Size = UDim2.new(0, settingsPanelWidth, 0, 0),
+        ClipsDescendants = true,
+        Visible = false,
+        Parent = self.mainFrameYay
+    })
+    makeThingExist("UICorner", {CornerRadius = UDim.new(0, 8), Parent = self.uiSettingsPanelFrame})
+    makeThingExist("UIStroke", {Color = Color3.fromRGB(44, 44, 44), Parent = self.uiSettingsPanelFrame})
+
+    makeThingExist("TextLabel", {
+        FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
+        Text = "UI Tweaks",
+        TextColor3 = Color3.new(1, 1, 1),
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0, 10, 0, 8 * mobileScaleFactor),
+        Size = UDim2.new(0.7, 0, 0, 16 * mobileScaleFactor),
+        TextSize = 13 * mobileScaleFactor,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = self.uiSettingsPanelFrame
+    })
+
+    self.uiAccentPreviewFrame = makeThingExist("Frame", {
+        BackgroundColor3 = self.config.AccentColor,
+        Position = UDim2.new(1, -22 * mobileScaleFactor, 0, 11 * mobileScaleFactor),
+        Size = UDim2.new(0, 10 * mobileScaleFactor, 0, 10 * mobileScaleFactor),
+        Parent = self.uiSettingsPanelFrame
+    })
+    makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = self.uiAccentPreviewFrame})
+
+    local rowY = 30 * mobileScaleFactor
+    local rowStep = 24 * mobileScaleFactor
+    local function createSettingsToggle(labelText, initial, callback)
+        local rowFrame = makeThingExist("Frame", {
+            BackgroundTransparency = 1,
+            Position = UDim2.new(0, 10, 0, rowY),
+            Size = UDim2.new(1, -20, 0, 20 * mobileScaleFactor),
+            Parent = self.uiSettingsPanelFrame
+        })
+        makeThingExist("TextLabel", {
+            FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
+            Text = labelText,
+            TextColor3 = Color3.fromRGB(150, 150, 150),
+            BackgroundTransparency = 1,
+            Size = UDim2.new(1, -46 * mobileScaleFactor, 1, 0),
+            TextSize = 12 * mobileScaleFactor,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            Parent = rowFrame
+        })
+        local switchFrame = makeThingExist("Frame", {
+            BackgroundColor3 = initial and self.config.AccentColor or Color3.fromRGB(33, 33, 33),
+            Position = UDim2.new(1, -34 * mobileScaleFactor, 0.5, -8 * mobileScaleFactor),
+            Size = UDim2.new(0, 34 * mobileScaleFactor, 0, 16 * mobileScaleFactor),
+            Parent = rowFrame
+        })
+        makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = switchFrame})
+        local knob = makeThingExist("Frame", {
+            BackgroundColor3 = initial and Color3.new(1, 1, 1) or Color3.fromRGB(95, 95, 95),
+            Position = initial and UDim2.new(0.5, 0, 0.5, -6 * mobileScaleFactor) or UDim2.new(0, 2 * mobileScaleFactor, 0.5, -6 * mobileScaleFactor),
+            Size = UDim2.new(0, 12 * mobileScaleFactor, 0, 12 * mobileScaleFactor),
+            Parent = switchFrame
+        })
+        makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = knob})
+
+        local state = initial == true
+        local function setState(nextState, skipCallback)
+            state = nextState == true
+            smoothMoveGoWoosh(switchFrame, {BackgroundColor3 = state and self.config.AccentColor or Color3.fromRGB(33, 33, 33)}, 0.16)
+            smoothMoveGoWoosh(knob, {
+                Position = state and UDim2.new(0.5, 0, 0.5, -6 * mobileScaleFactor) or UDim2.new(0, 2 * mobileScaleFactor, 0.5, -6 * mobileScaleFactor),
+                BackgroundColor3 = state and Color3.new(1, 1, 1) or Color3.fromRGB(95, 95, 95)
+            }, 0.16, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+            if not skipCallback then
+                callback(state)
+            end
+        end
+
+        local toggleButton = makeThingExist("TextButton", {
+            Text = "",
+            BackgroundTransparency = 1,
+            Size = UDim2.new(1, 0, 1, 0),
+            Parent = rowFrame
+        })
+        toggleButton.MouseButton1Click:Connect(function()
+            setState(not state, false)
+        end)
+
+        rowY = rowY + rowStep
+        return {
+            Set = setState,
+            Get = function()
+                return state
+            end
+        }
+    end
+
+    local blurToggleRef = createSettingsToggle("Blur Background", self._uiVisualSettings.Blur, function(enabled)
+        self._uiVisualSettings.Blur = enabled
+        self:_ApplyOpenCloseVisuals(false)
+    end)
+    local snowToggleRef = createSettingsToggle("Snow Overlay", self._uiVisualSettings.Snow, function(enabled)
+        self:_SetSnowEnabled(enabled)
+    end)
+    local bgFxToggleRef = createSettingsToggle("Background FX", self._uiVisualSettings.BackgroundEffects, function(enabled)
+        self:_SetBackgroundEffectsEnabled(enabled)
+    end)
+    local gradientToggleRef = createSettingsToggle("Text Gradient", self._uiVisualSettings.TextGradient, function(enabled)
+        self:_SetTextGradientEnabled(enabled)
+    end)
+    self.uiSettingsToggleRefs = {blurToggleRef, snowToggleRef, bgFxToggleRef, gradientToggleRef}
+
+    local fontRow = makeThingExist("Frame", {
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0, 10, 0, rowY + 2 * mobileScaleFactor),
+        Size = UDim2.new(1, -20, 0, 20 * mobileScaleFactor),
+        Parent = self.uiSettingsPanelFrame
+    })
+    makeThingExist("TextLabel", {
+        FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
+        Text = "Font",
+        TextColor3 = Color3.fromRGB(150, 150, 150),
+        BackgroundTransparency = 1,
+        Size = UDim2.new(0, 34 * mobileScaleFactor, 1, 0),
+        TextSize = 12 * mobileScaleFactor,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = fontRow
+    })
+    self.uiSettingsFontValueLabel = makeThingExist("TextLabel", {
+        FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
+        Text = self._fontPresets[self._fontPresetIndex].Name,
+        TextColor3 = Color3.fromRGB(210, 210, 210),
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0, 36 * mobileScaleFactor, 0, 0),
+        Size = UDim2.new(0, 82 * mobileScaleFactor, 1, 0),
+        TextSize = 12 * mobileScaleFactor,
+        TextTruncate = Enum.TextTruncate.AtEnd,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = fontRow
+    })
+    local fontCycleFrame = makeThingExist("Frame", {
+        BackgroundColor3 = Color3.fromRGB(29, 29, 29),
+        Position = UDim2.new(1, -44 * mobileScaleFactor, 0, 0),
+        Size = UDim2.new(0, 44 * mobileScaleFactor, 1, 0),
+        Parent = fontRow
+    })
+    makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = fontCycleFrame})
+    makeThingExist("TextLabel", {
+        FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
+        Text = "Next",
+        TextColor3 = Color3.fromRGB(190, 190, 190),
+        BackgroundTransparency = 1,
+        Size = UDim2.new(1, 0, 1, 0),
+        TextSize = 11 * mobileScaleFactor,
+        Parent = fontCycleFrame
+    })
+    local fontCycleButton = makeThingExist("TextButton", {
+        Text = "",
+        BackgroundTransparency = 1,
+        Size = UDim2.new(1, 0, 1, 0),
+        Parent = fontCycleFrame
+    })
+    fontCycleButton.MouseButton1Click:Connect(function()
+        self:ApplyFontPreset(self._fontPresetIndex + 1)
+    end)
+
+    local accentRowY = rowY + 28 * mobileScaleFactor
+    makeThingExist("TextLabel", {
+        FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
+        Text = "Accent",
+        TextColor3 = Color3.fromRGB(150, 150, 150),
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0, 10, 0, accentRowY),
+        Size = UDim2.new(0, 46 * mobileScaleFactor, 0, 16 * mobileScaleFactor),
+        TextSize = 12 * mobileScaleFactor,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = self.uiSettingsPanelFrame
+    })
+    local accentColors = {
+        Color3.fromRGB(2, 133, 255),
+        Color3.fromRGB(48, 196, 122),
+        Color3.fromRGB(237, 88, 88),
+        Color3.fromRGB(255, 169, 64),
+        Color3.fromRGB(185, 108, 255)
+    }
+    for index, color in ipairs(accentColors) do
+        local swatch = makeThingExist("Frame", {
+            BackgroundColor3 = color,
+            Position = UDim2.new(0, (58 + (index - 1) * 22) * mobileScaleFactor, 0, accentRowY - 1 * mobileScaleFactor),
+            Size = UDim2.new(0, 16 * mobileScaleFactor, 0, 16 * mobileScaleFactor),
+            Parent = self.uiSettingsPanelFrame
+        })
+        makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = swatch})
+        local swatchClick = makeThingExist("TextButton", {
+            Text = "",
+            BackgroundTransparency = 1,
+            Size = UDim2.new(1, 0, 1, 0),
+            Parent = swatch
+        })
+        swatchClick.MouseButton1Click:Connect(function()
+            self:SetAccentColor(color)
+            blurToggleRef:Set(self._uiVisualSettings.Blur, true)
+            snowToggleRef:Set(self._uiVisualSettings.Snow, true)
+            bgFxToggleRef:Set(self._uiVisualSettings.BackgroundEffects, true)
+            gradientToggleRef:Set(self._uiVisualSettings.TextGradient, true)
+        end)
+    end
+
+    local function setSettingsPanelOpen(openState)
+        self.uiSettingsOpen = openState == true
+        if self.uiSettingsOpen then
+            self.uiSettingsPanelFrame.Visible = true
+            smoothMoveGoWoosh(self.uiSettingsPanelFrame, {Size = UDim2.new(0, settingsPanelWidth, 0, settingsPanelHeight)}, 0.22)
+            smoothMoveGoWoosh(self.uiSettingsButtonFrame, {BackgroundColor3 = Color3.fromRGB(30, 30, 30)}, 0.2)
+            smoothMoveGoWoosh(self.uiSettingsButtonStroke, {Color = self.config.AccentColor:Lerp(Color3.fromRGB(20, 20, 20), 0.45)}, 0.2)
+        else
+            smoothMoveGoWoosh(self.uiSettingsPanelFrame, {Size = UDim2.new(0, settingsPanelWidth, 0, 0)}, 0.18, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
+            smoothMoveGoWoosh(self.uiSettingsButtonFrame, {BackgroundColor3 = Color3.fromRGB(20, 20, 20)}, 0.2)
+            smoothMoveGoWoosh(self.uiSettingsButtonStroke, {Color = Color3.fromRGB(45, 45, 45)}, 0.2)
+            task.delay(0.18, function()
+                if self.uiSettingsPanelFrame and self.uiSettingsPanelFrame.Parent and not self.uiSettingsOpen then
+                    self.uiSettingsPanelFrame.Visible = false
+                end
+            end)
+        end
+    end
+
+    settingsToggleButton.MouseButton1Click:Connect(function()
+        setSettingsPanelOpen(not self.uiSettingsOpen)
+    end)
+    settingsToggleButton.MouseEnter:Connect(function()
+        smoothMoveGoWoosh(self.uiSettingsButtonFrame, {BackgroundColor3 = Color3.fromRGB(28, 28, 28)}, 0.15)
+    end)
+    settingsToggleButton.MouseLeave:Connect(function()
+        if not self.uiSettingsOpen then
+            smoothMoveGoWoosh(self.uiSettingsButtonFrame, {BackgroundColor3 = Color3.fromRGB(20, 20, 20)}, 0.15)
+        end
+    end)
 end
 
 function superMegaAwesomeLibrary:CreateNotificationHolderForCoolNotifs()
@@ -1065,10 +1651,18 @@ function superMegaAwesomeLibrary:CreateSection(config)
         tabObj.rightColumnFrame = makeThingExist("Frame", {BackgroundTransparency = 1, Position = UDim2.new(0, 272 * mobileScaleFactor, 0, 0), Size = UDim2.new(0, 262 * mobileScaleFactor, 0, 1000), Parent = tabObj.contentScroll})
         
         function tabObj:Activate()
-            if sectionObj.Library.currentTabYay then sectionObj.Library.currentTabYay:Deactivate() end
+            if tabObj.isActive then
+                return
+            end
+            local previousTab = sectionObj.Library.currentTabYay
+            if previousTab and previousTab ~= tabObj then
+                previousTab:Deactivate(false)
+            end
             sectionObj.Library.currentTabYay = tabObj
             tabObj.isActive = true
+            tabObj.contentScroll.Position = UDim2.new(0, 22 * mobileScaleFactor, 0, 4)
             tabObj.contentScroll.Visible = true
+            smoothMoveGoWoosh(tabObj.contentScroll, {Position = UDim2.new(0, 4, 0, 4)}, 0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
             smoothMoveGoWoosh(tabObj.buttonFrame, {BackgroundTransparency = 0}, 0.2)
             smoothMoveGoWoosh(tabObj.iconImg, {ImageColor3 = Color3.new(1, 1, 1)}, 0.2)
             smoothMoveGoWoosh(tabObj.nameLabel, {TextColor3 = Color3.new(1, 1, 1)}, 0.2)
@@ -1076,7 +1670,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
             sectionObj.Library.tabDescriptionLabel.Text = tabConfig.Description
         end
         
-        function tabObj:Deactivate()
+        function tabObj:Deactivate(skipAnimation)
             tabObj.isActive = false
             for _, group in ipairs(tabObj.groupsInTab) do
                 for _, element in ipairs(group.elementsInGroup) do
@@ -1087,7 +1681,18 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     end
                 end
             end
-            tabObj.contentScroll.Visible = false
+            if skipAnimation then
+                tabObj.contentScroll.Visible = false
+                tabObj.contentScroll.Position = UDim2.new(0, 4, 0, 4)
+            else
+                smoothMoveGoWoosh(tabObj.contentScroll, {Position = UDim2.new(0, -16 * mobileScaleFactor, 0, 4)}, 0.14, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+                task.delay(0.14, function()
+                    if not tabObj.isActive and tabObj.contentScroll and tabObj.contentScroll.Parent then
+                        tabObj.contentScroll.Visible = false
+                        tabObj.contentScroll.Position = UDim2.new(0, 4, 0, 4)
+                    end
+                end)
+            end
             smoothMoveGoWoosh(tabObj.buttonFrame, {BackgroundTransparency = 1}, 0.2)
             smoothMoveGoWoosh(tabObj.iconImg, {ImageColor3 = Color3.fromRGB(89, 89, 89)}, 0.2)
             smoothMoveGoWoosh(tabObj.nameLabel, {TextColor3 = Color3.fromRGB(89, 89, 89)}, 0.2)
@@ -2935,8 +3540,40 @@ function superMegaAwesomeLibrary:CreateSection(config)
 end
 
 function superMegaAwesomeLibrary:SetAccentColor(color)
+    if typeof(color) ~= "Color3" then
+        return
+    end
     self.config.AccentColor = color
-    if self.mobileToggleIcon then self.mobileToggleIcon.ImageColor3 = color end
+    for _, section in ipairs(self.sectionsAreAwesome) do
+        for _, tab in ipairs(section.tabsInSection or {}) do
+            if tab.isActive and tab.buttonFrame then
+                tab.buttonFrame.BackgroundColor3 = color
+            end
+            for _, group in ipairs(tab.groupsInTab or {}) do
+                for _, element in ipairs(group.elementsInGroup or {}) do
+                    if type(element) == "table" then
+                        if element.switchFrame and element.value == true then
+                            element.switchFrame.BackgroundColor3 = color
+                        end
+                        if element.fillFrame then
+                            element.fillFrame.BackgroundColor3 = color
+                        end
+                        if element.toggleSwitchFrame and element.toggleValue == true then
+                            element.toggleSwitchFrame.BackgroundColor3 = color
+                        end
+                    end
+                end
+            end
+        end
+    end
+    self:_RefreshAccentCore()
+    if self.uiSettingsToggleRefs then
+        for _, toggleRef in ipairs(self.uiSettingsToggleRefs) do
+            if toggleRef and type(toggleRef.Get) == "function" and type(toggleRef.Set) == "function" then
+                toggleRef:Set(toggleRef:Get(), true)
+            end
+        end
+    end
 end
 
 function superMegaAwesomeLibrary:Destroy()
@@ -2978,9 +3615,15 @@ function superMegaAwesomeLibrary:Destroy()
 
     self._smoothScrollFrames = {}
     self._trackedControls = {}
+    self:_ClearSnowflakes()
     self._fpsRollingWindow = {}
     self._fpsRollingTotal = 0
     self._latestFPSValue = 0
+
+    if self._blurEffectRef and self._blurEffectRef.Parent then
+        self._blurEffectRef:Destroy()
+    end
+    self._blurEffectRef = nil
 
     if self.screenGuiYay and self.screenGuiYay.Parent then
         self.screenGuiYay:Destroy()
