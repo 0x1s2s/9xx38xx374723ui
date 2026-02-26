@@ -241,7 +241,8 @@ function superMegaAwesomeLibrary.new(config)
         Blur = true,
         Snow = true,
         BackgroundEffects = true,
-        TextGradient = true
+        TextGradient = true,
+        ESPSelfPreview = true
     }
     self._fontPresets = {
         {Name = "Gotham", EnumFont = Enum.Font.Gotham, Family = "rbxasset://fonts/families/GothamSSm.json", Weight = Enum.FontWeight.SemiBold},
@@ -257,6 +258,28 @@ function superMegaAwesomeLibrary.new(config)
     }
     self._fontPresetIndex = 1
     self._gradientLabels = {}
+    self._espPreviewProvider = nil
+    self._espPreviewData = nil
+    self._espPreviewState = nil
+    self._espPreviewResolveAccumulator = 0
+    self._espPreviewPanel = nil
+    self._espPreviewViewport = nil
+    self._espPreviewWorldModel = nil
+    self._espPreviewCamera = nil
+    self._espPreviewCharacter = nil
+    self._espPreviewLastCharacter = nil
+    self._espPreviewPartDefaults = {}
+    self._espPreviewHighlight = nil
+    self._espPreviewHeaderTag = nil
+    self._espPreviewBox = nil
+    self._espPreviewBoxStroke = nil
+    self._espPreviewHealthTrack = nil
+    self._espPreviewHealthFill = nil
+    self._espPreviewDot = nil
+    self._espPreviewTracer = nil
+    self._espPreviewName = nil
+    self._espPreviewItem = nil
+    self._espPreviewDistance = nil
     
     self:CreateUIBecauseWeNeedIt()
     
@@ -627,6 +650,752 @@ function superMegaAwesomeLibrary:_ApplyOpenCloseVisuals(instant)
         self._snowSpawnAccumulator = 0
         self:_ClearSnowflakes()
     end
+    self:_UpdateESPPreview(0)
+end
+
+local function flowPreviewPullValue(sourceTable, keys)
+    if type(sourceTable) ~= "table" then
+        return nil
+    end
+    for _, key in ipairs(keys) do
+        local value = sourceTable[key]
+        if value ~= nil then
+            return value
+        end
+    end
+    return nil
+end
+
+local function flowPreviewToBool(value)
+    if type(value) == "boolean" then
+        return value
+    end
+    if type(value) == "number" then
+        return value ~= 0
+    end
+    if type(value) == "string" then
+        local normalized = string.lower(value)
+        if normalized == "true" or normalized == "on" or normalized == "enabled" or normalized == "yes" or normalized == "1" then
+            return true
+        end
+        if normalized == "false" or normalized == "off" or normalized == "disabled" or normalized == "no" or normalized == "0" then
+            return false
+        end
+    end
+    return nil
+end
+
+local function flowPreviewToColor3(value)
+    if typeof(value) == "Color3" then
+        return value
+    end
+    if type(value) ~= "table" then
+        return nil
+    end
+    local r = value.r or value.R or value[1]
+    local g = value.g or value.G or value[2]
+    local b = value.b or value.B or value[3]
+    if type(r) ~= "number" or type(g) ~= "number" or type(b) ~= "number" then
+        return nil
+    end
+    if r > 1 or g > 1 or b > 1 then
+        r, g, b = r / 255, g / 255, b / 255
+    end
+    return Color3.new(math.clamp(r, 0, 1), math.clamp(g, 0, 1), math.clamp(b, 0, 1))
+end
+
+function superMegaAwesomeLibrary:SetESPPreviewProvider(providerFn)
+    if providerFn ~= nil and type(providerFn) ~= "function" then
+        return false, "ESP preview provider must be a function or nil."
+    end
+    self._espPreviewProvider = providerFn
+    self._espPreviewResolveAccumulator = 0.2
+    return true
+end
+
+function superMegaAwesomeLibrary:SetESPPreviewData(previewData)
+    if previewData ~= nil and type(previewData) ~= "table" then
+        return false, "ESP preview data must be a table or nil."
+    end
+    self._espPreviewData = previewData
+    self._espPreviewResolveAccumulator = 0.2
+    return true
+end
+
+function superMegaAwesomeLibrary:SetESPPreviewEnabled(enabled)
+    self._uiVisualSettings.ESPSelfPreview = enabled == true
+    self:_UpdateESPPreview(0)
+end
+
+function superMegaAwesomeLibrary:_DestroyESPPreviewCharacter()
+    if self._espPreviewHighlight then
+        self._espPreviewHighlight.Adornee = nil
+        self._espPreviewHighlight.Enabled = false
+    end
+    self._espPreviewPartDefaults = {}
+    if self._espPreviewCharacter and self._espPreviewCharacter.Parent then
+        self._espPreviewCharacter:Destroy()
+    end
+    self._espPreviewCharacter = nil
+    self._espPreviewLastCharacter = nil
+end
+
+function superMegaAwesomeLibrary:_EnsureESPPreviewCharacter()
+    if not self._espPreviewWorldModel then
+        return
+    end
+    local liveCharacter = theOneAndOnlyPlayer.Character
+    if liveCharacter and self._espPreviewCharacter and self._espPreviewCharacter.Parent and self._espPreviewLastCharacter == liveCharacter then
+        return
+    end
+    self:_DestroyESPPreviewCharacter()
+    if not liveCharacter then
+        return
+    end
+
+    local previousArchivable = liveCharacter.Archivable
+    local cloneCharacter = nil
+    local clonedOk = pcall(function()
+        liveCharacter.Archivable = true
+        cloneCharacter = liveCharacter:Clone()
+    end)
+    pcall(function()
+        liveCharacter.Archivable = previousArchivable
+    end)
+    if not clonedOk or not cloneCharacter then
+        return
+    end
+
+    for _, obj in ipairs(cloneCharacter:GetDescendants()) do
+        if obj:IsA("Script") or obj:IsA("LocalScript") then
+            obj:Destroy()
+        elseif obj:IsA("BasePart") then
+            self._espPreviewPartDefaults[obj] = {
+                Color = obj.Color,
+                Material = obj.Material,
+                Transparency = obj.Transparency
+            }
+            obj.Anchored = true
+            obj.CanCollide = false
+            obj.CastShadow = false
+        end
+    end
+
+    cloneCharacter.Parent = self._espPreviewWorldModel
+    pcall(function()
+        cloneCharacter:PivotTo(CFrame.new(0, -2.4, 0))
+    end)
+    self._espPreviewCharacter = cloneCharacter
+    self._espPreviewLastCharacter = liveCharacter
+    if self._espPreviewHighlight then
+        self._espPreviewHighlight.Adornee = cloneCharacter
+    end
+
+    if self._espPreviewCamera then
+        local focus = Vector3.new(0, 1.2, 0)
+        local depth = 7
+        local okExtents, extents = pcall(function()
+            return cloneCharacter:GetExtentsSize()
+        end)
+        if okExtents and extents then
+            depth = math.max(6.2, math.max(extents.X, extents.Z) * 2.2 + extents.Y * 0.45)
+            focus = Vector3.new(0, math.clamp(extents.Y * 0.2, 1, 2), 0)
+        end
+        self._espPreviewCamera.CFrame = CFrame.new(Vector3.new(0, focus.Y, depth), focus)
+    end
+end
+
+function superMegaAwesomeLibrary:_CreateESPPreviewPanel()
+    if self._espPreviewPanel and self._espPreviewPanel.Parent then
+        return
+    end
+    if not self.screenGuiYay or not self.screenGuiYay.Parent then
+        return
+    end
+
+    local panelWidth = 210 * mobileScaleFactor
+    local panelHeight = 272 * mobileScaleFactor
+    local panel = makeThingExist("Frame", {
+        Name = "FlowESPSelfPreviewPanel",
+        BackgroundColor3 = Color3.fromRGB(14, 14, 16),
+        BackgroundTransparency = 0.06,
+        BorderSizePixel = 0,
+        Position = UDim2.new(0, 14 * mobileScaleFactor, 0, 64 * mobileScaleFactor),
+        Size = UDim2.new(0, panelWidth, 0, panelHeight),
+        Visible = false,
+        ZIndex = 30,
+        Parent = self.screenGuiYay
+    })
+    makeThingExist("UICorner", {CornerRadius = UDim.new(0, 10), Parent = panel})
+    makeThingExist("UIStroke", {Color = Color3.fromRGB(40, 40, 44), Thickness = 1.1, Parent = panel})
+    makeThingExist("UIGradient", {
+        Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 20, 24)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(12, 12, 14))
+        }),
+        Rotation = 90,
+        Parent = panel
+    })
+
+    makeThingExist("TextLabel", {
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0, 10 * mobileScaleFactor, 0, 8 * mobileScaleFactor),
+        Size = UDim2.new(0, 110 * mobileScaleFactor, 0, 16 * mobileScaleFactor),
+        Text = "ESP Preview",
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextColor3 = Color3.fromRGB(240, 240, 240),
+        FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold, Enum.FontStyle.Normal),
+        TextSize = 13 * mobileScaleFactor,
+        ZIndex = 31,
+        Parent = panel
+    })
+
+    self._espPreviewHeaderTag = makeThingExist("TextLabel", {
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0.42, 0, 0, 8 * mobileScaleFactor),
+        Size = UDim2.new(0.58, -8 * mobileScaleFactor, 0, 16 * mobileScaleFactor),
+        Text = "@" .. tostring(theOneAndOnlyPlayer.Name),
+        TextXAlignment = Enum.TextXAlignment.Right,
+        TextColor3 = Color3.fromRGB(156, 156, 164),
+        FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Medium, Enum.FontStyle.Normal),
+        TextSize = 12 * mobileScaleFactor,
+        TextTruncate = Enum.TextTruncate.AtEnd,
+        ZIndex = 31,
+        Parent = panel
+    })
+
+    local card = makeThingExist("Frame", {
+        BackgroundColor3 = Color3.fromRGB(11, 11, 13),
+        BorderSizePixel = 0,
+        Position = UDim2.new(0, 8 * mobileScaleFactor, 0, 28 * mobileScaleFactor),
+        Size = UDim2.new(1, -16 * mobileScaleFactor, 1, -36 * mobileScaleFactor),
+        ZIndex = 30,
+        Parent = panel
+    })
+    makeThingExist("UICorner", {CornerRadius = UDim.new(0, 8), Parent = card})
+    makeThingExist("UIStroke", {Color = Color3.fromRGB(33, 33, 37), Parent = card})
+
+    local viewport = makeThingExist("ViewportFrame", {
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0, 8 * mobileScaleFactor, 0, 8 * mobileScaleFactor),
+        Size = UDim2.new(1, -16 * mobileScaleFactor, 1, -48 * mobileScaleFactor),
+        LightColor = Color3.new(1, 1, 1),
+        Ambient = Color3.fromRGB(96, 96, 102),
+        ZIndex = 31,
+        Parent = card
+    })
+    local worldModel = makeThingExist("WorldModel", {Parent = viewport})
+    local camera = makeThingExist("Camera", {
+        CFrame = CFrame.new(Vector3.new(0, 1.4, 7.2), Vector3.new(0, 1.2, 0)),
+        Parent = viewport
+    })
+    viewport.CurrentCamera = camera
+
+    self._espPreviewBox = makeThingExist("Frame", {
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0.18, 0, 0.07, 0),
+        Size = UDim2.new(0.64, 0, 0.84, 0),
+        Visible = false,
+        ZIndex = 33,
+        Parent = viewport
+    })
+    self._espPreviewBoxStroke = makeThingExist("UIStroke", {
+        Color = self.config.AccentColor,
+        Thickness = 1.5,
+        Parent = self._espPreviewBox
+    })
+
+    self._espPreviewHealthTrack = makeThingExist("Frame", {
+        BackgroundColor3 = Color3.fromRGB(28, 28, 32),
+        BorderSizePixel = 0,
+        Position = UDim2.new(0.15, 0, 0.07, 0),
+        Size = UDim2.new(0, 3 * mobileScaleFactor, 0.84, 0),
+        Visible = false,
+        ZIndex = 33,
+        Parent = viewport
+    })
+    self._espPreviewHealthFill = makeThingExist("Frame", {
+        BackgroundColor3 = Color3.fromRGB(100, 255, 100),
+        BorderSizePixel = 0,
+        AnchorPoint = Vector2.new(0, 1),
+        Position = UDim2.new(0, 0, 1, 0),
+        Size = UDim2.new(1, 0, 1, 0),
+        ZIndex = 34,
+        Parent = self._espPreviewHealthTrack
+    })
+
+    self._espPreviewDot = makeThingExist("Frame", {
+        BackgroundColor3 = self.config.AccentColor,
+        BorderSizePixel = 0,
+        Position = UDim2.new(0.5, -3 * mobileScaleFactor, 0.27, -3 * mobileScaleFactor),
+        Size = UDim2.new(0, 6 * mobileScaleFactor, 0, 6 * mobileScaleFactor),
+        Visible = false,
+        ZIndex = 34,
+        Parent = viewport
+    })
+    makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = self._espPreviewDot})
+
+    self._espPreviewTracer = makeThingExist("Frame", {
+        BackgroundColor3 = self.config.AccentColor,
+        BorderSizePixel = 0,
+        Position = UDim2.new(0.5, -1 * mobileScaleFactor, 0.58, 0),
+        Size = UDim2.new(0, 2 * mobileScaleFactor, 0.34, 0),
+        Visible = false,
+        ZIndex = 33,
+        Parent = viewport
+    })
+
+    self._espPreviewName = makeThingExist("TextLabel", {
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0, 0, 0, 1 * mobileScaleFactor),
+        Size = UDim2.new(1, 0, 0, 15 * mobileScaleFactor),
+        Text = tostring(theOneAndOnlyPlayer.Name),
+        TextColor3 = self.config.AccentColor,
+        TextXAlignment = Enum.TextXAlignment.Center,
+        TextTruncate = Enum.TextTruncate.AtEnd,
+        FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold, Enum.FontStyle.Normal),
+        TextSize = 11 * mobileScaleFactor,
+        Visible = false,
+        ZIndex = 34,
+        Parent = viewport
+    })
+
+    self._espPreviewDistance = makeThingExist("TextLabel", {
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0, 0, 1, -18 * mobileScaleFactor),
+        Size = UDim2.new(1, 0, 0, 14 * mobileScaleFactor),
+        Text = "0m",
+        TextColor3 = Color3.fromRGB(186, 186, 192),
+        TextXAlignment = Enum.TextXAlignment.Center,
+        FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Medium, Enum.FontStyle.Normal),
+        TextSize = 11 * mobileScaleFactor,
+        Visible = false,
+        ZIndex = 34,
+        Parent = card
+    })
+
+    self._espPreviewItem = makeThingExist("TextLabel", {
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0, 0, 1, -32 * mobileScaleFactor),
+        Size = UDim2.new(1, 0, 0, 14 * mobileScaleFactor),
+        Text = "None",
+        TextColor3 = Color3.fromRGB(206, 206, 212),
+        TextXAlignment = Enum.TextXAlignment.Center,
+        TextTruncate = Enum.TextTruncate.AtEnd,
+        FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Medium, Enum.FontStyle.Normal),
+        TextSize = 11 * mobileScaleFactor,
+        Visible = false,
+        ZIndex = 34,
+        Parent = card
+    })
+
+    self._espPreviewHighlight = makeThingExist("Highlight", {
+        Enabled = false,
+        DepthMode = Enum.HighlightDepthMode.AlwaysOnTop,
+        Parent = worldModel
+    })
+
+    self._espPreviewPanel = panel
+    self._espPreviewViewport = viewport
+    self._espPreviewWorldModel = worldModel
+    self._espPreviewCamera = camera
+    self:_EnsureESPPreviewCharacter()
+    self:_UpdateESPPreview(0)
+end
+
+function superMegaAwesomeLibrary:_ResolveESPPreviewState()
+    local state = {
+        Enabled = true,
+        ShowBox = false,
+        ShowHealth = false,
+        ShowName = false,
+        UseDisplayName = false,
+        ShowItem = false,
+        ShowDistance = false,
+        ShowTracers = false,
+        ShowDot = false,
+        ShowChams = false,
+        ShowHighlight = false,
+        ChamsTransparency = 0.55,
+        HighlightFillTransparency = 0.5,
+        HighlightOutlineTransparency = 0,
+        Color = self.config.AccentColor,
+        Name = tostring(theOneAndOnlyPlayer.Name),
+        Item = "None",
+        DistanceText = "0m",
+        HealthPercent = 1
+    }
+
+    local liveCharacter = theOneAndOnlyPlayer.Character
+    local liveHumanoid = liveCharacter and liveCharacter:FindFirstChildOfClass("Humanoid")
+    if liveHumanoid and liveHumanoid.MaxHealth > 0 then
+        state.HealthPercent = math.clamp(liveHumanoid.Health / liveHumanoid.MaxHealth, 0, 1)
+    end
+    if liveCharacter then
+        for _, tool in ipairs(liveCharacter:GetChildren()) do
+            if tool:IsA("Tool") then
+                state.Item = tool.Name
+                break
+            end
+        end
+        local localRoot = liveCharacter:FindFirstChild("HumanoidRootPart")
+        local cameraRef = workspace.CurrentCamera
+        if localRoot and cameraRef then
+            state.DistanceText = string.format("%.0fm", (cameraRef.CFrame.Position - localRoot.Position).Magnitude)
+        end
+    end
+
+    local function applyStateFromTrackedControls()
+        local touched = false
+        for flagName, control in pairs(self._trackedControls) do
+            if type(control) == "table" and type(control.get) == "function" then
+                local okValue, controlValue = pcall(control.get)
+                if okValue then
+                    local rawFlag = string.lower(tostring(flagName or ""))
+                    local compactFlag = rawFlag:gsub("[^%w]", "")
+                    local function hasFlagToken(...)
+                        local tokens = {...}
+                        for _, token in ipairs(tokens) do
+                            local rawToken = string.lower(tostring(token))
+                            local compactToken = rawToken:gsub("[^%w]", "")
+                            if rawToken ~= "" and string.find(rawFlag, rawToken, 1, true) then
+                                return true
+                            end
+                            if compactToken ~= "" and string.find(compactFlag, compactToken, 1, true) then
+                                return true
+                            end
+                        end
+                        return false
+                    end
+                    local boolValue = flowPreviewToBool(controlValue)
+                    if boolValue ~= nil then
+                        if hasFlagToken("esp enabled", "espenabled", "esp toggle", "toggle esp", "enable esp") then
+                            state.Enabled = boolValue
+                            touched = true
+                        elseif hasFlagToken("show box", "showbox", "box esp", "boxes") then
+                            state.ShowBox = boolValue
+                            touched = true
+                        elseif hasFlagToken("show health", "health bar", "healthesp", "showhealth") then
+                            state.ShowHealth = boolValue
+                            touched = true
+                        elseif hasFlagToken("show name", "name esp", "nametag", "showname") then
+                            state.ShowName = boolValue
+                            touched = true
+                        elseif hasFlagToken("display name", "usedisplayname") then
+                            state.UseDisplayName = boolValue
+                            touched = true
+                        elseif hasFlagToken("show equipped item", "show item", "show weapon", "item esp", "tool esp") then
+                            state.ShowItem = boolValue
+                            touched = true
+                        elseif hasFlagToken("show distance", "distance esp", "showdistance") then
+                            state.ShowDistance = boolValue
+                            touched = true
+                        elseif hasFlagToken("show tracers", "tracers", "tracer esp") then
+                            state.ShowTracers = boolValue
+                            touched = true
+                        elseif hasFlagToken("show dot", "dot esp", "head dot", "headdot") then
+                            state.ShowDot = boolValue
+                            touched = true
+                        elseif hasFlagToken("chams enabled", "chams", "use chams") then
+                            state.ShowChams = boolValue
+                            touched = true
+                        elseif hasFlagToken("highlight enabled", "use highlight", "highlight") then
+                            state.ShowHighlight = boolValue
+                            touched = true
+                        end
+                    elseif typeof(controlValue) == "Color3" then
+                        if hasFlagToken("esp color", "visual color", "highlight color", "chams color", "espcolour", "visualcolour") then
+                            state.Color = controlValue
+                            touched = true
+                        end
+                    elseif type(controlValue) == "number" then
+                        if hasFlagToken("chams transparency", "cham transparency") then
+                            state.ChamsTransparency = math.clamp(controlValue, 0, 1)
+                            touched = true
+                        elseif hasFlagToken("fill transparency", "highlight fill transparency") then
+                            state.HighlightFillTransparency = math.clamp(controlValue, 0, 1)
+                            touched = true
+                        elseif hasFlagToken("outline transparency", "highlight outline transparency") then
+                            state.HighlightOutlineTransparency = math.clamp(controlValue, 0, 1)
+                            touched = true
+                        end
+                    end
+                end
+            end
+        end
+        return touched
+    end
+
+    local function applyStateFrom(sourceTable)
+        if type(sourceTable) ~= "table" then
+            return false
+        end
+        local touched = false
+        local function setBoolField(targetField, keys)
+            local rawValue = flowPreviewPullValue(sourceTable, keys)
+            local boolValue = flowPreviewToBool(rawValue)
+            if boolValue ~= nil then
+                state[targetField] = boolValue
+                touched = true
+            end
+        end
+        local function setNumberField(targetField, keys, minValue, maxValue)
+            local rawValue = flowPreviewPullValue(sourceTable, keys)
+            if type(rawValue) == "number" then
+                state[targetField] = math.clamp(rawValue, minValue, maxValue)
+                touched = true
+            end
+        end
+
+        setBoolField("Enabled", {"ESPEnabled", "Enabled", "ESP", "MasterEnabled", "MasterSwitch"})
+        setBoolField("ShowBox", {"ShowBox", "Boxes", "Box", "BoxESP"})
+        setBoolField("ShowHealth", {"ShowHealth", "Health", "HealthBar", "HealthESP"})
+        setBoolField("ShowName", {"ShowName", "Names", "NameESP", "Nametags"})
+        setBoolField("UseDisplayName", {"UseDisplayName", "DisplayName", "DisplayNames"})
+        setBoolField("ShowItem", {"ShowEquippedItem", "ShowItem", "ItemESP", "ShowWeapon", "ShowTool"})
+        setBoolField("ShowDistance", {"ShowDistance", "Distance", "DistanceESP"})
+        setBoolField("ShowTracers", {"ShowTracers", "Tracers", "TracerESP"})
+        setBoolField("ShowDot", {"ShowDot", "Dot", "DotESP", "HeadDot"})
+        setBoolField("ShowChams", {"ChamsEnabled", "Chams", "UseChams", "CharacterMaterial"})
+        setBoolField("ShowHighlight", {"HighlightEnabled", "Highlight", "UseHighlight"})
+
+        setNumberField("ChamsTransparency", {"ChamsTransparency", "ChamTransparency", "ChamsAlpha"}, 0, 1)
+        setNumberField("HighlightFillTransparency", {"HighlightFillTransparency", "HighlightFillAlpha"}, 0, 1)
+        setNumberField("HighlightOutlineTransparency", {"HighlightOutlineTransparency", "HighlightOutlineAlpha"}, 0, 1)
+
+        local colorValue = flowPreviewToColor3(flowPreviewPullValue(sourceTable, {
+            "VisualColor", "ESPColor", "Color", "Colour", "MainColor", "ChamsColor", "HighlightColor"
+        }))
+        if colorValue then
+            state.Color = colorValue
+            touched = true
+        end
+
+        local suppliedName = flowPreviewPullValue(sourceTable, {"Name", "PlayerName", "DisplayName", "NameText"})
+        if type(suppliedName) == "string" and suppliedName ~= "" then
+            state.Name = suppliedName
+            touched = true
+        end
+        local suppliedItem = flowPreviewPullValue(sourceTable, {"Item", "ItemName", "Tool", "ToolName", "Weapon", "WeaponName"})
+        if type(suppliedItem) == "string" and suppliedItem ~= "" then
+            state.Item = suppliedItem
+            touched = true
+        end
+        local suppliedDistanceText = flowPreviewPullValue(sourceTable, {"DistanceText", "DistanceString", "DistanceLabel"})
+        if type(suppliedDistanceText) == "string" and suppliedDistanceText ~= "" then
+            state.DistanceText = suppliedDistanceText
+            touched = true
+        else
+            local suppliedDistance = flowPreviewPullValue(sourceTable, {"Distance", "DistanceValue"})
+            if type(suppliedDistance) == "number" then
+                state.DistanceText = string.format("%.0fm", suppliedDistance)
+                touched = true
+            end
+        end
+
+        local suppliedHealthPercent = flowPreviewPullValue(sourceTable, {"HealthPercent", "HPPercent", "HealthRatio"})
+        if type(suppliedHealthPercent) == "number" then
+            if suppliedHealthPercent > 1 then
+                suppliedHealthPercent = suppliedHealthPercent / 100
+            end
+            state.HealthPercent = math.clamp(suppliedHealthPercent, 0, 1)
+            touched = true
+        else
+            local suppliedHealth = flowPreviewPullValue(sourceTable, {"Health", "HP"})
+            local suppliedMaxHealth = flowPreviewPullValue(sourceTable, {"MaxHealth", "MaxHP", "HealthMax"})
+            if type(suppliedHealth) == "number" and type(suppliedMaxHealth) == "number" and suppliedMaxHealth > 0 then
+                state.HealthPercent = math.clamp(suppliedHealth / suppliedMaxHealth, 0, 1)
+                touched = true
+            end
+        end
+
+        return touched
+    end
+
+    local appliedTracked = applyStateFromTrackedControls()
+    local appliedExternal = false
+    if type(self._espPreviewData) == "table" then
+        appliedExternal = applyStateFrom(self._espPreviewData) or appliedExternal
+    end
+    if type(self._espPreviewProvider) == "function" then
+        local ok, providerResult = pcall(self._espPreviewProvider, self, state)
+        if ok and type(providerResult) == "table" then
+            appliedExternal = applyStateFrom(providerResult) or appliedExternal
+        end
+    end
+
+    if not appliedExternal and not appliedTracked then
+        local candidates = {}
+        local candidateSet = {}
+        local function addCandidate(candidate)
+            if type(candidate) ~= "table" then
+                return
+            end
+            if candidateSet[candidate] then
+                return
+            end
+            candidateSet[candidate] = true
+            table.insert(candidates, candidate)
+        end
+        local function addFromEnvironment(env)
+            if type(env) ~= "table" then
+                return
+            end
+            addCandidate(env.Settings)
+            addCandidate(env.settings)
+            addCandidate(env.ESPSettings)
+            addCandidate(env.VisualSettings)
+            addCandidate(env.Visuals)
+            addCandidate(env.ESP)
+            addCandidate(env.esp)
+            addCandidate(env.Flags)
+            addCandidate(env.flags)
+            if type(env.Config) == "table" then
+                addCandidate(env.Config.Settings)
+                addCandidate(env.Config.ESP)
+                addCandidate(env.Config.Visuals)
+            end
+        end
+        if type(getgenv) == "function" then
+            local okEnv, env = pcall(getgenv)
+            if okEnv then
+                addFromEnvironment(env)
+            end
+        end
+        addFromEnvironment(_G)
+
+        local knownKeys = {
+            "ESPEnabled", "ShowBox", "ShowHealth", "ShowName", "UseDisplayName", "ShowEquippedItem",
+            "ShowDistance", "ShowTracers", "ShowDot", "ChamsEnabled", "HighlightEnabled", "VisualColor"
+        }
+        local bestCandidate = nil
+        local bestScore = 0
+        for _, candidate in ipairs(candidates) do
+            local score = 0
+            for _, keyName in ipairs(knownKeys) do
+                if candidate[keyName] ~= nil then
+                    score = score + 1
+                end
+            end
+            if score > bestScore then
+                bestScore = score
+                bestCandidate = candidate
+            end
+        end
+        if bestCandidate and bestScore > 0 then
+            applyStateFrom(bestCandidate)
+        end
+    end
+
+    if state.UseDisplayName then
+        state.Name = tostring(theOneAndOnlyPlayer.DisplayName or theOneAndOnlyPlayer.Name)
+    elseif state.Name == "" or state.Name == nil then
+        state.Name = tostring(theOneAndOnlyPlayer.Name)
+    end
+    return state
+end
+
+function superMegaAwesomeLibrary:_UpdateESPPreview(dt)
+    if not self._espPreviewPanel or not self._espPreviewPanel.Parent then
+        self:_CreateESPPreviewPanel()
+    end
+    if not self._espPreviewPanel then
+        return
+    end
+
+    local shouldShow = self.isToggledOn and self._uiVisualSettings.ESPSelfPreview
+    self._espPreviewPanel.Visible = shouldShow
+    if not shouldShow then
+        return
+    end
+
+    self._espPreviewResolveAccumulator = self._espPreviewResolveAccumulator + (dt or 0)
+    if not self._espPreviewState or self._espPreviewResolveAccumulator >= 0.16 then
+        self._espPreviewState = self:_ResolveESPPreviewState()
+        self._espPreviewResolveAccumulator = 0
+    end
+    local state = self._espPreviewState or self:_ResolveESPPreviewState()
+    local previewColor = state.Color or self.config.AccentColor
+
+    self:_EnsureESPPreviewCharacter()
+    if self._espPreviewHeaderTag then
+        self._espPreviewHeaderTag.Text = "@" .. tostring(theOneAndOnlyPlayer.Name)
+    end
+    if not self._espPreviewCharacter then
+        if self._espPreviewBox then self._espPreviewBox.Visible = false end
+        if self._espPreviewHealthTrack then self._espPreviewHealthTrack.Visible = false end
+        if self._espPreviewDot then self._espPreviewDot.Visible = false end
+        if self._espPreviewTracer then self._espPreviewTracer.Visible = false end
+        if self._espPreviewName then self._espPreviewName.Visible = false end
+        if self._espPreviewItem then self._espPreviewItem.Visible = false end
+        if self._espPreviewDistance then self._espPreviewDistance.Visible = false end
+        if self._espPreviewHighlight then self._espPreviewHighlight.Enabled = false end
+        return
+    end
+
+    if self._espPreviewBoxStroke then self._espPreviewBoxStroke.Color = previewColor end
+    if self._espPreviewDot then self._espPreviewDot.BackgroundColor3 = previewColor end
+    if self._espPreviewTracer then self._espPreviewTracer.BackgroundColor3 = previewColor end
+
+    if self._espPreviewBox then
+        self._espPreviewBox.Visible = state.ShowBox == true and state.Enabled ~= false
+    end
+    if self._espPreviewDot then
+        self._espPreviewDot.Visible = state.ShowDot == true and state.Enabled ~= false
+    end
+    if self._espPreviewTracer then
+        self._espPreviewTracer.Visible = state.ShowTracers == true and state.Enabled ~= false
+    end
+
+    if self._espPreviewName then
+        self._espPreviewName.Visible = state.ShowName == true and state.Enabled ~= false
+        self._espPreviewName.Text = tostring(state.Name or theOneAndOnlyPlayer.Name)
+        self._espPreviewName.TextColor3 = previewColor
+    end
+
+    if self._espPreviewItem then
+        self._espPreviewItem.Visible = state.ShowItem == true and state.Enabled ~= false
+        self._espPreviewItem.Text = tostring(state.Item or "None")
+        self._espPreviewItem.TextColor3 = previewColor
+    end
+
+    if self._espPreviewDistance then
+        self._espPreviewDistance.Visible = state.ShowDistance == true and state.Enabled ~= false
+        self._espPreviewDistance.Text = tostring(state.DistanceText or "0m")
+        self._espPreviewDistance.TextColor3 = previewColor
+    end
+
+    if self._espPreviewHealthTrack then
+        local showHealth = state.ShowHealth == true and state.Enabled ~= false
+        self._espPreviewHealthTrack.Visible = showHealth
+        if showHealth and self._espPreviewHealthFill then
+            local hpPercent = math.clamp(tonumber(state.HealthPercent) or 1, 0, 1)
+            self._espPreviewHealthFill.Size = UDim2.new(1, 0, hpPercent, 0)
+            self._espPreviewHealthFill.BackgroundColor3 = Color3.new(1 - hpPercent, hpPercent, 0)
+        end
+    end
+
+    for part, originalData in pairs(self._espPreviewPartDefaults) do
+        if part and part.Parent and originalData then
+            if state.ShowChams == true and state.Enabled ~= false and part.Name ~= "HumanoidRootPart" then
+                part.Material = Enum.Material.ForceField
+                part.Color = previewColor
+                part.Transparency = math.clamp(state.ChamsTransparency or 0.55, 0, 0.92)
+            else
+                part.Material = originalData.Material
+                part.Color = originalData.Color
+                part.Transparency = originalData.Transparency
+            end
+        end
+    end
+
+    if self._espPreviewHighlight then
+        self._espPreviewHighlight.FillColor = previewColor
+        self._espPreviewHighlight.OutlineColor = previewColor
+        self._espPreviewHighlight.FillTransparency = math.clamp(state.HighlightFillTransparency or 0.5, 0, 1)
+        self._espPreviewHighlight.OutlineTransparency = math.clamp(state.HighlightOutlineTransparency or 0, 0, 1)
+        self._espPreviewHighlight.Enabled = state.ShowHighlight == true and state.Enabled ~= false
+    end
 end
 
 function superMegaAwesomeLibrary:EnableSmoothScrolling(scrollFrame, smoothSpeed)
@@ -817,6 +1586,7 @@ function superMegaAwesomeLibrary:CreateUIBecauseWeNeedIt()
     
     self:CreateWatermarkBecauseWeCool()
     self:CreateMainFrameYay()
+    self:_CreateESPPreviewPanel()
     self:CreateNotificationHolderForCoolNotifs()
     self:CreateMobileToggleButton()
     self:ApplyFontPreset(self._fontPresetIndex)
@@ -861,6 +1631,8 @@ function superMegaAwesomeLibrary:CreateUIBecauseWeNeedIt()
                 end
             end
         end
+
+        self:_UpdateESPPreview(dt)
 
         if self._uiVisualSettings.BackgroundEffects and self.mainBackgroundEffectsFrame and self.mainBackgroundEffectsFrame.Visible then
             self._backgroundFxTime = self._backgroundFxTime + dt
@@ -1298,7 +2070,7 @@ function superMegaAwesomeLibrary:CreateMainFrameYay()
     })
 
     local settingsPanelWidth = 185 * mobileScaleFactor
-    local settingsPanelHeight = 218 * mobileScaleFactor
+    local settingsPanelHeight = 244 * mobileScaleFactor
     self.uiSettingsOpen = false
 
     self.uiSettingsButtonFrame = makeThingExist("Frame", {
@@ -1448,7 +2220,11 @@ function superMegaAwesomeLibrary:CreateMainFrameYay()
     local gradientToggleRef = createSettingsToggle("Text Gradient", self._uiVisualSettings.TextGradient, function(enabled)
         self:_SetTextGradientEnabled(enabled)
     end)
-    self.uiSettingsToggleRefs = {blurToggleRef, overlayToggleRef, bgFxToggleRef, gradientToggleRef}
+    local espPreviewToggleRef = createSettingsToggle("ESP Preview", self._uiVisualSettings.ESPSelfPreview, function(enabled)
+        self._uiVisualSettings.ESPSelfPreview = enabled
+        self:_UpdateESPPreview(0)
+    end)
+    self.uiSettingsToggleRefs = {blurToggleRef, overlayToggleRef, bgFxToggleRef, gradientToggleRef, espPreviewToggleRef}
 
     local overlayRow = makeThingExist("Frame", {
         BackgroundTransparency = 1,
@@ -4056,6 +4832,7 @@ function superMegaAwesomeLibrary:SetAccentColor(color)
             end
         end
     end
+    self:_UpdateESPPreview(0)
 end
 
 function superMegaAwesomeLibrary:Destroy()
@@ -4098,14 +4875,37 @@ function superMegaAwesomeLibrary:Destroy()
     self._smoothScrollFrames = {}
     self._trackedControls = {}
     self:_ClearSnowflakes()
+    self:_DestroyESPPreviewCharacter()
     self._fpsRollingWindow = {}
     self._fpsRollingTotal = 0
     self._latestFPSValue = 0
+    self._espPreviewState = nil
+    self._espPreviewProvider = nil
+    self._espPreviewData = nil
 
     if self._blurEffectRef and self._blurEffectRef.Parent then
         self._blurEffectRef:Destroy()
     end
     self._blurEffectRef = nil
+
+    if self._espPreviewPanel and self._espPreviewPanel.Parent then
+        self._espPreviewPanel:Destroy()
+    end
+    self._espPreviewPanel = nil
+    self._espPreviewViewport = nil
+    self._espPreviewWorldModel = nil
+    self._espPreviewCamera = nil
+    self._espPreviewHighlight = nil
+    self._espPreviewHeaderTag = nil
+    self._espPreviewBox = nil
+    self._espPreviewBoxStroke = nil
+    self._espPreviewHealthTrack = nil
+    self._espPreviewHealthFill = nil
+    self._espPreviewDot = nil
+    self._espPreviewTracer = nil
+    self._espPreviewName = nil
+    self._espPreviewItem = nil
+    self._espPreviewDistance = nil
 
     if self.screenGuiYay and self.screenGuiYay.Parent then
         self.screenGuiYay:Destroy()
