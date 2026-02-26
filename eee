@@ -1405,7 +1405,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
                     TextColor3 = Color3.fromRGB(124, 124, 124), Text = keybindConfig.Name, BackgroundTransparency = 1,
                     Position = UDim2.new(0, 10, 0, yPosition), TextSize = 14 * mobileScaleFactor,
-                    Size = UDim2.new(0, 145 * mobileScaleFactor, 0, 20 * mobileScaleFactor),
+                    Size = UDim2.new(0, 112 * mobileScaleFactor, 0, 20 * mobileScaleFactor),
                     TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd,
                     Parent = groupObj.mainFrame
                 })
@@ -1421,6 +1421,34 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 
                 local keyDisplayText = getDisplayText()
                 local keyWidth = math.max(62 * mobileScaleFactor, howWideIsThisText(keyDisplayText, 12 * mobileScaleFactor) + 30 * mobileScaleFactor)
+                local modeTagWidth = 52 * mobileScaleFactor
+                local modeTagHeight = 18 * mobileScaleFactor
+                local modeTagOffset = 6 * mobileScaleFactor
+                local modeTagY = yPosition + 1.5 * mobileScaleFactor
+                
+                keybindObj.modeTagFrame = makeThingExist("Frame", {
+                    BackgroundColor3 = Color3.fromRGB(28, 28, 28),
+                    Position = UDim2.new(1, -keyWidth - 10 - modeTagWidth - modeTagOffset, 0, modeTagY),
+                    Size = UDim2.new(0, modeTagWidth, 0, modeTagHeight),
+                    Parent = groupObj.mainFrame
+                })
+                makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = keybindObj.modeTagFrame})
+                keybindObj.modeTagStroke = makeThingExist("UIStroke", {
+                    Color = Color3.fromRGB(44, 44, 44),
+                    Thickness = 1,
+                    Parent = keybindObj.modeTagFrame
+                })
+                
+                keybindObj.modeTagLabel = makeThingExist("TextLabel", {
+                    FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
+                    TextColor3 = Color3.fromRGB(124, 124, 124),
+                    Text = keybindObj.mode,
+                    BackgroundTransparency = 1,
+                    Size = UDim2.new(1, 0, 1, 0),
+                    TextSize = 11.5 * mobileScaleFactor,
+                    TextXAlignment = Enum.TextXAlignment.Center,
+                    Parent = keybindObj.modeTagFrame
+                })
                 
                 keybindObj.buttonFrame = makeThingExist("Frame", {
                     BackgroundColor3 = Color3.fromRGB(32, 32, 32), Position = UDim2.new(1, -keyWidth - 10, 0, yPosition),
@@ -1536,6 +1564,9 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 local function updateKeybindSizeYay(text)
                     local newWidth = math.max(48 * mobileScaleFactor, howWideIsThisText(text, 12 * mobileScaleFactor) + 30 * mobileScaleFactor)
                     smoothMoveGoWoosh(keybindObj.buttonFrame, {Size = UDim2.new(0, newWidth, 0, 21 * mobileScaleFactor), Position = UDim2.new(1, -newWidth - 10, 0, yPosition)}, 0.15)
+                    smoothMoveGoWoosh(keybindObj.modeTagFrame, {
+                        Position = UDim2.new(1, -newWidth - 10 - modeTagWidth - modeTagOffset, 0, modeTagY)
+                    }, 0.15)
                 end
                 
                 local modePositionConn = nil
@@ -1575,9 +1606,17 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     smoothMoveGoWoosh(toggleModeLabel, {TextColor3 = isToggleSelected and selectedText or idleText}, 0.15)
                     smoothMoveGoWoosh(holdModeFrame, {BackgroundColor3 = isToggleSelected and idleBg or selectedBg}, 0.15)
                     smoothMoveGoWoosh(holdModeLabel, {TextColor3 = isToggleSelected and idleText or selectedText}, 0.15)
+                    toggleModeLabel.Text = isToggleSelected and "Toggle (Selected)" or "Toggle"
+                    holdModeLabel.Text = isToggleSelected and "Hold" or "Hold (Selected)"
+                    
+                    local tagActiveColor = keybindObj.mode == "Hold" and Color3.fromRGB(210, 180, 120) or groupObj.Library.config.AccentColor
+                    smoothMoveGoWoosh(keybindObj.modeTagFrame, {BackgroundColor3 = tagActiveColor:Lerp(Color3.fromRGB(16, 16, 16), 0.55)}, 0.15)
+                    smoothMoveGoWoosh(keybindObj.modeTagStroke, {Color = tagActiveColor:Lerp(Color3.fromRGB(26, 26, 26), 0.5)}, 0.15)
+                    smoothMoveGoWoosh(keybindObj.modeTagLabel, {TextColor3 = Color3.new(1, 1, 1)}, 0.15)
+                    keybindObj.modeTagLabel.Text = keybindObj.mode
                 end
                 
-                local function setMode(modeValue)
+                local function setMode(modeValue, silent)
                     local newMode = normalizeMode(modeValue)
                     if newMode == keybindObj.mode then
                         updateModeVisuals()
@@ -1593,6 +1632,14 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     updateKeybindSizeYay(newDisplayText)
                     updateModeVisuals()
                     keybindConfig.ModeChangedCallback(newMode)
+                    if not silent then
+                        groupObj.Library:Notify({
+                            Title = keybindConfig.Name .. " mode updated",
+                            Description = "Now using " .. newMode .. " input",
+                            Duration = 2.2,
+                            Icon = "rbxassetid://6031075938"
+                        })
+                    end
                 end
                 
                 function keybindObj:Set(key)
@@ -1611,8 +1658,8 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     return keybindObj.value
                 end
                 
-                function keybindObj:SetMode(modeValue)
-                    setMode(modeValue)
+                function keybindObj:SetMode(modeValue, silent)
+                    setMode(modeValue, silent)
                 end
                 
                 function keybindObj:GetMode()
@@ -1659,12 +1706,12 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 end)
                 
                 toggleModeClickButton.MouseButton1Click:Connect(function()
-                    setMode("Toggle")
+                    setMode("Toggle", false)
                     closeModeMenu(false)
                 end)
                 
                 holdModeClickButton.MouseButton1Click:Connect(function()
-                    setMode("Hold")
+                    setMode("Hold", false)
                     closeModeMenu(false)
                 end)
                 
@@ -1734,7 +1781,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 groupObj.Library:RegisterControl(keybindConfig.ModeFlag, function()
                     return keybindObj:GetMode()
                 end, function(value)
-                    keybindObj:SetMode(value)
+                    keybindObj:SetMode(value, true)
                 end)
                 
                 updateModeVisuals()
