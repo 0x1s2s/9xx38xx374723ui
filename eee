@@ -2049,14 +2049,24 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 labelConfig.Text = labelConfig.Text or "Label"
                 addSearchTerm(labelConfig.Text)
                 local yPosition = groupObj.elementYPos
+                local labelMaxWidth = 238 * mobileScaleFactor
+                local labelTextSize = 14 * mobileScaleFactor
+                local measuredBounds = textServiceBeLikeText:GetTextSize(
+                    tostring(labelConfig.Text),
+                    labelTextSize,
+                    Enum.Font.GothamSemibold,
+                    Vector2.new(labelMaxWidth, math.huge)
+                )
+                local labelHeight = math.max(20 * mobileScaleFactor, measuredBounds.Y)
                 local labelText = makeThingExist("TextLabel", {
                     FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
                     TextColor3 = Color3.fromRGB(124, 124, 124), Text = labelConfig.Text, BackgroundTransparency = 1,
-                    Position = UDim2.new(0, 10, 0, yPosition), TextSize = 14 * mobileScaleFactor,
-                    Size = UDim2.new(0.92, 0, 0, 20 * mobileScaleFactor), TextXAlignment = Enum.TextXAlignment.Left,
+                    Position = UDim2.new(0, 10, 0, yPosition), TextSize = labelTextSize,
+                    Size = UDim2.new(0, labelMaxWidth, 0, labelHeight), TextXAlignment = Enum.TextXAlignment.Left,
+                    TextYAlignment = Enum.TextYAlignment.Top, TextWrapped = true,
                     Parent = groupObj.mainFrame
                 })
-                groupObj.elementYPos = groupObj.elementYPos + 24 * mobileScaleFactor
+                groupObj.elementYPos = groupObj.elementYPos + labelHeight + 6 * mobileScaleFactor
                 updateGroupSizeYay()
                 return labelText
             end
