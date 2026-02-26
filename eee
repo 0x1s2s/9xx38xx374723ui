@@ -343,7 +343,7 @@ function superMegaAwesomeLibrary:_SpawnSnowflake()
         Size = UDim2.new(0, size, 0, size),
         Position = UDim2.new(0, startX, 0, -math.random(6, 80)),
         Rotation = math.random(0, 359),
-        ZIndex = 1,
+        ZIndex = 2,
         Parent = self.snowLayerFrame
     })
     table.insert(self._snowflakes, {
@@ -369,33 +369,70 @@ function superMegaAwesomeLibrary:_SpawnRainDrop()
     end
     local viewportSize = self.screenGuiYay.AbsoluteSize
     local width = math.max(200, math.floor(viewportSize.X))
-    local length = math.random(10, 22) * mobileScaleFactor
-    local thickness = math.random(1, 2) * mobileScaleFactor
-    local startX = math.random(-30, width + 30)
+    local depthScale = math.random(70, 135) / 100
+    local length = ((math.random(14, 30) * depthScale) + 2) * mobileScaleFactor
+    local thickness = math.clamp(math.floor(1 + depthScale * 1.15), 1, 2) * mobileScaleFactor
+    local startX = math.random(-42, width + 42)
+    local angle = math.random(12, 24)
     local drop = makeThingExist("Frame", {
         BorderSizePixel = 0,
-        BackgroundColor3 = Color3.fromRGB(186, 215, 255),
-        BackgroundTransparency = math.random(26, 52) / 100,
-        Position = UDim2.new(0, startX, 0, -math.random(18, 110)),
+        BackgroundColor3 = Color3.fromRGB(170 + math.random(0, 30), 205 + math.random(0, 30), 255),
+        BackgroundTransparency = math.random(20, 52) / 100,
+        Position = UDim2.new(0, startX, 0, -math.random(28, 140)),
         Size = UDim2.new(0, thickness, 0, length),
-        Rotation = math.random(8, 16),
-        ZIndex = 1,
+        Rotation = angle,
+        ZIndex = 2,
         Parent = self.snowLayerFrame
     })
     makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = drop})
     table.insert(self._snowflakes, {
-        overlayType = "Rain",
+        overlayType = "RainDrop",
         instance = drop,
         baseX = startX,
         yOffset = drop.Position.Y.Offset,
+        angle = angle,
         width = thickness,
         length = length,
         baseTransparency = drop.BackgroundTransparency,
-        fallSpeed = math.random(190, 310) * mobileScaleFactor,
-        driftAmount = math.random(1, 6) * mobileScaleFactor,
-        driftSpeed = math.random(12, 26) / 10,
+        fallSpeed = math.random(255, 430) * depthScale * mobileScaleFactor,
+        driftSpeed = math.random(8, 18) / 10,
+        windStrength = math.random(16, 40) * depthScale * mobileScaleFactor,
+        windJitter = math.random(3, 13) * mobileScaleFactor,
+        slant = math.random(6, 14) / 1000,
         stretchPulse = math.random(16, 28) / 10,
+        splashChance = 0.55 + math.random() * 0.25,
         phase = math.random() * math.pi * 2
+    })
+end
+
+function superMegaAwesomeLibrary:_SpawnRainSplash(xPosition, yPosition)
+    if not self.snowLayerFrame or not self.snowLayerFrame.Parent then
+        return
+    end
+    local startSize = math.random(2, 4) * mobileScaleFactor
+    local splash = makeThingExist("Frame", {
+        BorderSizePixel = 0,
+        BackgroundColor3 = Color3.fromRGB(190 + math.random(0, 20), 220 + math.random(0, 25), 255),
+        BackgroundTransparency = math.random(28, 44) / 100,
+        Position = UDim2.new(0, xPosition, 0, yPosition),
+        Size = UDim2.new(0, startSize, 0, math.max(1 * mobileScaleFactor, startSize * 0.5)),
+        ZIndex = 2,
+        Parent = self.snowLayerFrame
+    })
+    makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = splash})
+    local life = math.random(9, 16) / 100
+    table.insert(self._snowflakes, {
+        overlayType = "RainSplash",
+        instance = splash,
+        baseX = xPosition,
+        yOffset = yPosition,
+        life = life,
+        totalLife = life,
+        startSize = startSize,
+        startThickness = math.max(1 * mobileScaleFactor, startSize * 0.5),
+        endSize = math.random(8, 16) * mobileScaleFactor,
+        driftX = math.random(-10, 10) * mobileScaleFactor,
+        baseTransparency = splash.BackgroundTransparency
     })
 end
 
@@ -405,29 +442,33 @@ function superMegaAwesomeLibrary:_SpawnStarParticle()
     end
     local viewportSize = self.screenGuiYay.AbsoluteSize
     local width = math.max(200, math.floor(viewportSize.X))
-    local size = math.random(1, 3) * mobileScaleFactor + (isMobileUserSadly and 0.35 or 0.6)
+    local height = math.max(220, math.floor(viewportSize.Y))
+    local size = math.random(2, 5) * mobileScaleFactor
     local startX = math.random(0, width)
-    local star = makeThingExist("Frame", {
-        BorderSizePixel = 0,
-        BackgroundColor3 = Color3.fromRGB(235, 241, 255),
-        BackgroundTransparency = math.random(45, 72) / 100,
-        Position = UDim2.new(0, startX, 0, -math.random(14, 90)),
+    local startY = math.random(-24, height + 12)
+    local star = makeThingExist("ImageLabel", {
+        BackgroundTransparency = 1,
+        Image = "rbxassetid://3570695787",
+        ImageColor3 = Color3.fromRGB(220 + math.random(0, 35), 230 + math.random(0, 25), 255),
+        ImageTransparency = math.random(26, 60) / 100,
+        Position = UDim2.new(0, startX, 0, startY),
         Size = UDim2.new(0, size, 0, size),
-        ZIndex = 1,
+        ZIndex = 2,
         Parent = self.snowLayerFrame
     })
-    makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = star})
     table.insert(self._snowflakes, {
         overlayType = "Stars",
         instance = star,
         baseX = startX,
-        yOffset = star.Position.Y.Offset,
-        fallSpeed = math.random(4, 12) * mobileScaleFactor,
-        driftAmount = math.random(8, 24) * mobileScaleFactor,
-        driftLift = math.random(3, 10) * mobileScaleFactor,
+        yOffset = startY,
+        baseSize = size,
+        fallSpeed = math.random(2, 7) * mobileScaleFactor,
+        driftAmount = math.random(10, 30) * mobileScaleFactor,
+        driftLift = math.random(4, 12) * mobileScaleFactor,
         driftSpeed = math.random(4, 11) / 10,
         twinkleSpeed = math.random(8, 20) / 10,
-        baseTransparency = star.BackgroundTransparency,
+        pulseAmount = (math.random(10, 28) / 100),
+        baseTransparency = star.ImageTransparency,
         phase = math.random() * math.pi * 2
     })
 end
@@ -758,7 +799,7 @@ function superMegaAwesomeLibrary:CreateUIBecauseWeNeedIt()
         BackgroundTransparency = 1,
         BorderSizePixel = 0,
         Size = UDim2.new(1, 0, 1, 0),
-        ZIndex = 1,
+        ZIndex = 2,
         ClipsDescendants = true,
         Parent = self.screenGuiYay
     })
@@ -838,11 +879,11 @@ function superMegaAwesomeLibrary:CreateUIBecauseWeNeedIt()
             local spawnInterval
             local maxParticles
             if overlayMode == "Rain" then
-                spawnInterval = isMobileUserSadly and 0.028 or 0.016
-                maxParticles = isMobileUserSadly and 52 or 118
+                spawnInterval = isMobileUserSadly and 0.018 or 0.011
+                maxParticles = isMobileUserSadly and 70 or 140
             elseif overlayMode == "Stars" then
-                spawnInterval = isMobileUserSadly and 0.08 or 0.048
-                maxParticles = isMobileUserSadly and 38 or 84
+                spawnInterval = isMobileUserSadly and 0.045 or 0.028
+                maxParticles = isMobileUserSadly and 68 or 140
             else
                 spawnInterval = isMobileUserSadly and 0.13 or 0.085
                 maxParticles = isMobileUserSadly and 38 or 72
@@ -859,6 +900,7 @@ function superMegaAwesomeLibrary:CreateUIBecauseWeNeedIt()
             end
             local nowTick = os.clock()
             local viewportHeight = math.max(320, math.floor(self.screenGuiYay.AbsoluteSize.Y))
+            local viewportWidth = math.max(200, math.floor(self.screenGuiYay.AbsoluteSize.X))
             for i = #self._snowflakes, 1, -1 do
                 local flakeData = self._snowflakes[i]
                 local flakeObj = flakeData and flakeData.instance
@@ -866,28 +908,62 @@ function superMegaAwesomeLibrary:CreateUIBecauseWeNeedIt()
                     table.remove(self._snowflakes, i)
                 else
                     local overlayType = flakeData.overlayType or "Snow"
-                    flakeData.yOffset = flakeData.yOffset + flakeData.fallSpeed * dt
-                    local driftX = math.sin(nowTick * flakeData.driftSpeed + flakeData.phase) * flakeData.driftAmount
-                    if overlayType == "Rain" then
-                        flakeObj.Position = UDim2.new(0, flakeData.baseX + driftX, 0, flakeData.yOffset)
+                    if overlayType == "RainDrop" then
+                        flakeData.yOffset = flakeData.yOffset + flakeData.fallSpeed * dt
+                        local windOffset = math.sin(nowTick * 0.35 + flakeData.phase) * flakeData.windStrength
+                            + math.sin(nowTick * flakeData.driftSpeed + flakeData.phase) * flakeData.windJitter
+                        local xPos = flakeData.baseX + windOffset + (flakeData.yOffset * flakeData.slant)
+                        flakeObj.Position = UDim2.new(0, xPos, 0, flakeData.yOffset)
                         local stretchPulse = 0.82 + math.sin(nowTick * flakeData.stretchPulse + flakeData.phase) * 0.18
                         flakeObj.Size = UDim2.new(0, flakeData.width, 0, flakeData.length * stretchPulse)
-                        flakeObj.BackgroundTransparency = math.clamp(flakeData.baseTransparency + (math.sin(nowTick * 4 + flakeData.phase) * 0.04), 0.14, 0.86)
+                        flakeObj.Rotation = flakeData.angle
+                        flakeObj.BackgroundTransparency = math.clamp(flakeData.baseTransparency + (math.sin(nowTick * 4 + flakeData.phase) * 0.05), 0.12, 0.88)
+                        if flakeData.yOffset > viewportHeight + 20 then
+                            if xPos > -40 and xPos < viewportWidth + 40 and math.random() < flakeData.splashChance then
+                                self:_SpawnRainSplash(xPos, viewportHeight - math.random(1, 8))
+                            end
+                            flakeObj:Destroy()
+                            table.remove(self._snowflakes, i)
+                        end
+                    elseif overlayType == "RainSplash" then
+                        flakeData.life = flakeData.life - dt
+                        if flakeData.life <= 0 then
+                            flakeObj:Destroy()
+                            table.remove(self._snowflakes, i)
+                        else
+                            local progress = 1 - (flakeData.life / flakeData.totalLife)
+                            local widthNow = flakeData.startSize + flakeData.endSize * progress
+                            local heightNow = math.max(1 * mobileScaleFactor, flakeData.startThickness * (1 - progress * 0.8))
+                            flakeObj.Size = UDim2.new(0, widthNow, 0, heightNow)
+                            flakeObj.Position = UDim2.new(0, flakeData.baseX + flakeData.driftX * progress, 0, flakeData.yOffset - progress * 1.2)
+                            flakeObj.BackgroundTransparency = math.clamp(flakeData.baseTransparency + progress * 0.55, 0.2, 0.97)
+                        end
                     elseif overlayType == "Stars" then
+                        flakeData.yOffset = flakeData.yOffset + flakeData.fallSpeed * dt
+                        local driftX = math.sin(nowTick * flakeData.driftSpeed + flakeData.phase) * flakeData.driftAmount
                         local driftY = math.cos(nowTick * (flakeData.driftSpeed * 0.72) + flakeData.phase) * flakeData.driftLift
                         flakeObj.Position = UDim2.new(0, flakeData.baseX + driftX, 0, flakeData.yOffset + driftY)
-                        local twinkle = (math.sin(nowTick * flakeData.twinkleSpeed + flakeData.phase) + 1) * 0.5
-                        flakeObj.BackgroundTransparency = math.clamp(flakeData.baseTransparency - twinkle * 0.3, 0.05, 0.9)
+                        local sparkle = (math.sin(nowTick * flakeData.twinkleSpeed + flakeData.phase) + 1) * 0.5
+                        local pulse = 1 + (math.sin(nowTick * (flakeData.twinkleSpeed * 0.75) + flakeData.phase) * flakeData.pulseAmount)
+                        local sizeNow = math.max(1 * mobileScaleFactor, flakeData.baseSize * pulse)
+                        flakeObj.Size = UDim2.new(0, sizeNow, 0, sizeNow)
+                        flakeObj.ImageTransparency = math.clamp(flakeData.baseTransparency - sparkle * 0.42, 0.02, 0.94)
+                        if flakeData.yOffset > viewportHeight + 30 then
+                            flakeObj:Destroy()
+                            table.remove(self._snowflakes, i)
+                        end
                     else
+                        flakeData.yOffset = flakeData.yOffset + flakeData.fallSpeed * dt
+                        local driftX = math.sin(nowTick * flakeData.driftSpeed + flakeData.phase) * flakeData.driftAmount
                         local swirlX = math.cos(nowTick * (flakeData.driftSpeed * 0.58) + flakeData.phase) * flakeData.swirlAmount
                         flakeObj.Position = UDim2.new(0, flakeData.baseX + driftX + swirlX, 0, flakeData.yOffset)
                         flakeObj.Rotation = (flakeObj.Rotation + flakeData.spin * dt) % 360
                         local twinkle = (math.sin(nowTick * flakeData.twinkleSpeed + flakeData.phase) + 1) * 0.5
                         flakeObj.ImageTransparency = math.clamp(flakeData.baseTransparency + twinkle * 0.22, 0.08, 0.84)
-                    end
-                    if flakeData.yOffset > viewportHeight + 28 then
-                        flakeObj:Destroy()
-                        table.remove(self._snowflakes, i)
+                        if flakeData.yOffset > viewportHeight + 28 then
+                            flakeObj:Destroy()
+                            table.remove(self._snowflakes, i)
+                        end
                     end
                 end
             end
