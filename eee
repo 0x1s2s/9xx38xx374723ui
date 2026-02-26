@@ -42,54 +42,82 @@ end
 
 local function makeDraggableCuzWeCan(frame, handle, libraryRef)
     local amIDragging = false
-    local whatAmIDragging
+    local activeDragInput
     local whereDidIStart
     local whereWasIBefore
+    local targetDragPosition = frame.Position
+    local dragLerpSpeed = isMobileUserSadly and 18 or 22
     
     handle = handle or frame
     
-    local function updatePositionYay(input)
+    local function updateTargetPositionYay(input)
         local howMuchDidIMove = input.Position - whereDidIStart
-        frame.Position = UDim2.new(whereWasIBefore.X.Scale, whereWasIBefore.X.Offset + howMuchDidIMove.X, whereWasIBefore.Y.Scale, whereWasIBefore.Y.Offset + howMuchDidIMove.Y)
+        targetDragPosition = UDim2.new(
+            whereWasIBefore.X.Scale,
+            whereWasIBefore.X.Offset + howMuchDidIMove.X,
+            whereWasIBefore.Y.Scale,
+            whereWasIBefore.Y.Offset + howMuchDidIMove.Y
+        )
     end
-    
-    local inputBeganConn = handle.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            amIDragging = true
-            whereDidIStart = input.Position
-            whereWasIBefore = frame.Position
-            
-            local inputEndConn
-            inputEndConn = input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    amIDragging = false
-                    if inputEndConn then
-                        inputEndConn:Disconnect()
-                        inputEndConn = nil
-                    end
-                end
-            end)
-            if libraryRef and type(libraryRef._TrackConnection) == "function" then
-                libraryRef:_TrackConnection(inputEndConn)
+
+    local renderDragConn = runServiceMoreLikeWalkService.RenderStepped:Connect(function(dt)
+        if not frame or not frame.Parent then return end
+        local currentPos = frame.Position
+        local goalPos = targetDragPosition
+        local offsetDelta = math.abs(goalPos.X.Offset - currentPos.X.Offset) + math.abs(goalPos.Y.Offset - currentPos.Y.Offset)
+        if offsetDelta <= 0.1 then
+            if not amIDragging then
+                frame.Position = goalPos
             end
+            return
         end
+        local alpha = math.clamp(1 - math.exp(-dragLerpSpeed * dt), 0, 0.45)
+        frame.Position = currentPos:Lerp(goalPos, alpha)
     end)
     
-    local inputChangedConn = handle.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-            whatAmIDragging = input
+    local inputBeganConn = handle.InputBegan:Connect(function(input)
+        local isMouse = input.UserInputType == Enum.UserInputType.MouseButton1
+        local isTouch = input.UserInputType == Enum.UserInputType.Touch
+        if not isMouse and not isTouch then
+            return
+        end
+
+        amIDragging = true
+        activeDragInput = isTouch and input or nil
+        whereDidIStart = input.Position
+        whereWasIBefore = frame.Position
+        targetDragPosition = frame.Position
+        
+        local inputEndConn
+        inputEndConn = input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                amIDragging = false
+                activeDragInput = nil
+                if inputEndConn then
+                    inputEndConn:Disconnect()
+                    inputEndConn = nil
+                end
+            end
+        end)
+        if libraryRef and type(libraryRef._TrackConnection) == "function" then
+            libraryRef:_TrackConnection(inputEndConn)
         end
     end)
     
     local userInputChangedConn = thisInputServiceGoesHard.InputChanged:Connect(function(input)
-        if input == whatAmIDragging and amIDragging then
-            updatePositionYay(input)
+        if not amIDragging then
+            return
+        end
+        if input.UserInputType == Enum.UserInputType.MouseMovement then
+            updateTargetPositionYay(input)
+        elseif input.UserInputType == Enum.UserInputType.Touch and (activeDragInput == nil or input == activeDragInput) then
+            updateTargetPositionYay(input)
         end
     end)
 
     if libraryRef and type(libraryRef._TrackConnection) == "function" then
+        libraryRef:_TrackConnection(renderDragConn)
         libraryRef:_TrackConnection(inputBeganConn)
-        libraryRef:_TrackConnection(inputChangedConn)
         libraryRef:_TrackConnection(userInputChangedConn)
     end
 end
@@ -248,17 +276,26 @@ function superMegaAwesomeLibrary:ApplySearchFilter(rawQuery)
     local query = normalizeSearchText(rawQuery)
     self._searchQuery = query
     local firstVisibleTab = nil
+    local function matchesAny(queryText, termList)
+        if queryText == "" then return true end
+        if type(termList) ~= "table" then return false end
+        for _, term in ipairs(termList) do
+            local normalized = normalizeSearchText(term)
+            if normalized ~= "" and string.find(normalized, queryText, 1, true) ~= nil then
+                return true
+            end
+        end
+        return false
+    end
     
     for _, section in ipairs(self.sectionsAreAwesome) do
         local sectionHasVisibleContent = false
         for _, tab in ipairs(section.tabsInSection) do
-            local tabName = normalizeSearchText(tab.tabNameForSearch)
-            local tabMatch = query == "" or string.find(tabName, query, 1, true) ~= nil
+            local tabMatch = matchesAny(query, tab.searchTerms)
             local groupMatch = false
             
             for _, group in ipairs(tab.groupsInTab) do
-                local name = normalizeSearchText(group.groupNameForSearch)
-                local visible = query == "" or tabMatch or string.find(name, query, 1, true) ~= nil
+                local visible = query == "" or tabMatch or matchesAny(query, group.searchTerms)
                 if group.mainFrame then
                     group.mainFrame.Visible = visible
                 end
@@ -851,6 +888,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
         
         local tabObj = {}
         tabObj.tabNameForSearch = tabConfig.Name
+        tabObj.searchTerms = {tabConfig.Name, tabConfig.Description}
         tabObj.groupsInTab = {}
         tabObj.groupPositions = {Left = 0, Right = 0}
         tabObj.isActive = false
@@ -942,11 +980,18 @@ function superMegaAwesomeLibrary:CreateSection(config)
             
             local groupObj = {}
             groupObj.groupNameForSearch = groupConfig.Name
+            groupObj.searchTerms = {groupConfig.Name}
             groupObj.elementsInGroup = {}
             groupObj.Library = tabObj.Library
             groupObj.elementYPos = 35 * mobileScaleFactor
             local function createAutoFlag(elementName)
                 return tostring(tabObj.tabNameForSearch) .. "." .. tostring(groupObj.groupNameForSearch) .. "." .. tostring(elementName or "Value")
+            end
+            local function addSearchTerm(term)
+                local normalized = normalizeSearchText(term)
+                if normalized ~= "" then
+                    table.insert(groupObj.searchTerms, tostring(term))
+                end
             end
             
             local parentColumn = groupConfig.Side == "Left" and tabObj.leftColumnFrame or tabObj.rightColumnFrame
@@ -992,6 +1037,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 toggleConfig.Default = toggleConfig.Default or false
                 toggleConfig.Callback = toggleConfig.Callback or function() end
                 toggleConfig.Flag = toggleConfig.Flag or createAutoFlag(toggleConfig.Name)
+                addSearchTerm(toggleConfig.Name)
                 
                 local toggleObj = {}
                 toggleObj.value = toggleConfig.Default
@@ -1061,6 +1107,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 sliderConfig.Increment = sliderConfig.Increment or 1
                 sliderConfig.Callback = sliderConfig.Callback or function() end
                 sliderConfig.Flag = sliderConfig.Flag or createAutoFlag(sliderConfig.Name)
+                addSearchTerm(sliderConfig.Name)
                 
                 local sliderObj = {}
                 sliderObj.value = sliderConfig.Default
@@ -1144,6 +1191,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 buttonConfig.Icon = buttonConfig.Icon
                 buttonConfig.Locked = buttonConfig.Locked or false
                 buttonConfig.Callback = buttonConfig.Callback or function() end
+                addSearchTerm(buttonConfig.Name)
                 
                 local buttonObj = {}
                 buttonObj.isLocked = buttonConfig.Locked
@@ -1202,6 +1250,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 keybindConfig.Callback = keybindConfig.Callback or function() end
                 keybindConfig.ChangedCallback = keybindConfig.ChangedCallback or function() end
                 keybindConfig.Flag = keybindConfig.Flag or createAutoFlag(keybindConfig.Name)
+                addSearchTerm(keybindConfig.Name)
                 
                 local keybindObj = {}
                 keybindObj.value = keybindConfig.Default
@@ -1315,6 +1364,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 keybindToggleConfig.ChangedCallback = keybindToggleConfig.ChangedCallback or function() end
                 keybindToggleConfig.Flag = keybindToggleConfig.Flag or createAutoFlag(keybindToggleConfig.Name .. ".Key")
                 keybindToggleConfig.ToggleFlag = keybindToggleConfig.ToggleFlag or createAutoFlag(keybindToggleConfig.Name .. ".Enabled")
+                addSearchTerm(keybindToggleConfig.Name)
                 
                 local keybindToggleObj = {}
                 keybindToggleObj.keyValue = keybindToggleConfig.Default
@@ -1458,6 +1508,10 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 dropdownConfig.Default = dropdownConfig.Default or dropdownConfig.Options[1]
                 dropdownConfig.Callback = dropdownConfig.Callback or function() end
                 dropdownConfig.Flag = dropdownConfig.Flag or createAutoFlag(dropdownConfig.Name)
+                addSearchTerm(dropdownConfig.Name)
+                for _, option in ipairs(dropdownConfig.Options) do
+                    addSearchTerm(option)
+                end
                 
                 local dropdownObj = {}
                 dropdownObj.value = dropdownConfig.Default
@@ -1651,7 +1705,13 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 
                 function dropdownObj:UpdateOptions(newOptions)
                     dropdownConfig.Options = newOptions
+                    for _, option in ipairs(dropdownConfig.Options) do
+                        addSearchTerm(option)
+                    end
                     createOptionsYay()
+                    if groupObj.Library._searchQuery ~= "" then
+                        groupObj.Library:ApplySearchFilter(groupObj.Library._searchQuery)
+                    end
                 end
 
                 function dropdownObj:Close()
@@ -1678,6 +1738,10 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 multiDropdownConfig.Default = multiDropdownConfig.Default or {}
                 multiDropdownConfig.Callback = multiDropdownConfig.Callback or function() end
                 multiDropdownConfig.Flag = multiDropdownConfig.Flag or createAutoFlag(multiDropdownConfig.Name)
+                addSearchTerm(multiDropdownConfig.Name)
+                for _, option in ipairs(multiDropdownConfig.Options) do
+                    addSearchTerm(option)
+                end
                 
                 local multiDropdownObj = {}
                 multiDropdownObj.selectedValues = {}
@@ -1935,7 +1999,13 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 
                 function multiDropdownObj:UpdateOptions(newOptions)
                     multiDropdownConfig.Options = newOptions
+                    for _, option in ipairs(multiDropdownConfig.Options) do
+                        addSearchTerm(option)
+                    end
                     createMultiOptionsYay()
+                    if groupObj.Library._searchQuery ~= "" then
+                        groupObj.Library:ApplySearchFilter(groupObj.Library._searchQuery)
+                    end
                 end
                 
                 function multiDropdownObj:Get() return getSelectedArray() end
@@ -1977,6 +2047,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
             function groupObj:AddLabel(labelConfig)
                 labelConfig = labelConfig or {}
                 labelConfig.Text = labelConfig.Text or "Label"
+                addSearchTerm(labelConfig.Text)
                 local yPosition = groupObj.elementYPos
                 local labelText = makeThingExist("TextLabel", {
                     FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
@@ -1997,6 +2068,8 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 textInputConfig.Default = textInputConfig.Default or ""
                 textInputConfig.Callback = textInputConfig.Callback or function() end
                 textInputConfig.Flag = textInputConfig.Flag or createAutoFlag(textInputConfig.Name)
+                addSearchTerm(textInputConfig.Name)
+                addSearchTerm(textInputConfig.Placeholder)
                 
                 local textInputObj = {}
                 textInputObj.value = textInputConfig.Default
@@ -2071,6 +2144,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 colorPickerConfig.Default = colorPickerConfig.Default or Color3.fromRGB(255, 100, 150)
                 colorPickerConfig.Callback = colorPickerConfig.Callback or function() end
                 colorPickerConfig.Flag = colorPickerConfig.Flag or createAutoFlag(colorPickerConfig.Name)
+                addSearchTerm(colorPickerConfig.Name)
                 
                 local colorPickerObj = {}
                 colorPickerObj.value = colorPickerConfig.Default
