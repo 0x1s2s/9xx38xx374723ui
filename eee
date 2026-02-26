@@ -7,6 +7,7 @@ local playersAreNoobs = v0rtexdIsTheBestDev(game:GetService("Players"))
 local textServiceBeLikeText = v0rtexdIsTheBestDev(game:GetService("TextService"))
 local coreGuiMoreLikeBoreGui = v0rtexdIsTheBestDev(game:GetService("CoreGui"))
 local guiServiceIsCool = v0rtexdIsTheBestDev(game:GetService("GuiService"))
+local httpServiceNoCap = v0rtexdIsTheBestDev(game:GetService("HttpService"))
 
 local superMegaAwesomeLibrary = {}
 superMegaAwesomeLibrary.__index = superMegaAwesomeLibrary
@@ -33,13 +34,13 @@ local function makeThingExist(className, properties)
 end
 
 local function smoothMoveGoWoosh(instance, properties, duration, easingStyle, easingDirection)
-    local tweenInfoYay = TweenInfo.new(duration or 0.2, easingStyle or Enum.EasingStyle.Quad, easingDirection or Enum.EasingDirection.Out)
+    local tweenInfoYay = TweenInfo.new(duration or 0.22, easingStyle or Enum.EasingStyle.Quint, easingDirection or Enum.EasingDirection.Out)
     local tweenGoVroom = oMgThisTweenServiceIsSoCool:Create(instance, tweenInfoYay, properties)
     tweenGoVroom:Play()
     return tweenGoVroom
 end
 
-local function makeDraggableCuzWeCan(frame, handle)
+local function makeDraggableCuzWeCan(frame, handle, libraryRef)
     local amIDragging = false
     local whatAmIDragging
     local whereDidIStart
@@ -52,31 +53,45 @@ local function makeDraggableCuzWeCan(frame, handle)
         frame.Position = UDim2.new(whereWasIBefore.X.Scale, whereWasIBefore.X.Offset + howMuchDidIMove.X, whereWasIBefore.Y.Scale, whereWasIBefore.Y.Offset + howMuchDidIMove.Y)
     end
     
-    handle.InputBegan:Connect(function(input)
+    local inputBeganConn = handle.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             amIDragging = true
             whereDidIStart = input.Position
             whereWasIBefore = frame.Position
             
-            input.Changed:Connect(function()
+            local inputEndConn
+            inputEndConn = input.Changed:Connect(function()
                 if input.UserInputState == Enum.UserInputState.End then
                     amIDragging = false
+                    if inputEndConn then
+                        inputEndConn:Disconnect()
+                        inputEndConn = nil
+                    end
                 end
             end)
+            if libraryRef and type(libraryRef._TrackConnection) == "function" then
+                libraryRef:_TrackConnection(inputEndConn)
+            end
         end
     end)
     
-    handle.InputChanged:Connect(function(input)
+    local inputChangedConn = handle.InputChanged:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
             whatAmIDragging = input
         end
     end)
     
-    thisInputServiceGoesHard.InputChanged:Connect(function(input)
+    local userInputChangedConn = thisInputServiceGoesHard.InputChanged:Connect(function(input)
         if input == whatAmIDragging and amIDragging then
             updatePositionYay(input)
         end
     end)
+
+    if libraryRef and type(libraryRef._TrackConnection) == "function" then
+        libraryRef:_TrackConnection(inputBeganConn)
+        libraryRef:_TrackConnection(inputChangedConn)
+        libraryRef:_TrackConnection(userInputChangedConn)
+    end
 end
 
 local function getPlayerAvatarCuzTheyreBeautiful(userId)
@@ -107,6 +122,52 @@ local function truncateTextLikeABoss(text, maxWidth, textSize, font)
     return truncated .. "..."
 end
 
+local function normalizeSearchText(text)
+    return string.lower(tostring(text or "")):gsub("^%s+", ""):gsub("%s+$", "")
+end
+
+local function serializeConfigValue(value)
+    local valueType = typeof(value)
+    if valueType == "Color3" then
+        return {
+            __type = "Color3",
+            r = value.R,
+            g = value.G,
+            b = value.B
+        }
+    end
+    if valueType == "EnumItem" and value.EnumType == Enum.KeyCode then
+        return {
+            __type = "KeyCode",
+            value = value.Name
+        }
+    end
+    return value
+end
+
+local function deserializeConfigValue(value)
+    if type(value) ~= "table" or not value.__type then
+        return value
+    end
+    if value.__type == "Color3" and value.r and value.g and value.b then
+        return Color3.new(value.r, value.g, value.b)
+    end
+    if value.__type == "KeyCode" and value.value then
+        return Enum.KeyCode[value.value] or Enum.KeyCode.Unknown
+    end
+    return value
+end
+
+local function sanitizeConfigName(name)
+    local cleanName = tostring(name or "default")
+    cleanName = cleanName:gsub("[\\/:*?\"<>|]", "_")
+    cleanName = cleanName:gsub("^%s+", ""):gsub("%s+$", "")
+    if cleanName == "" then
+        cleanName = "default"
+    end
+    return cleanName
+end
+
 function superMegaAwesomeLibrary.new(config)
     local self = setmetatable({}, superMegaAwesomeLibrary)
     
@@ -126,10 +187,176 @@ function superMegaAwesomeLibrary.new(config)
     self.dropdownHolderRef = nil
     self.toggleKeyCode = Enum.KeyCode.RightControl
     self.toggleButtonVisible = true
+    self._destroyed = false
+    self._connections = {}
+    self._trackedControls = {}
+    self._smoothScrollFrames = {}
+    self._searchQuery = ""
+    self._fpsRollingWindow = {}
+    self._fpsRollingTotal = 0
+    self._fpsRollingSize = 60
+    self._latestFPSValue = 0
     
     self:CreateUIBecauseWeNeedIt()
     
     return self
+end
+
+function superMegaAwesomeLibrary:_TrackConnection(conn)
+    if conn then
+        table.insert(self._connections, conn)
+        if #self._connections % 100 == 0 then
+            local activeConnections = {}
+            for _, item in ipairs(self._connections) do
+                if item and typeof(item) == "RBXScriptConnection" and item.Connected then
+                    table.insert(activeConnections, item)
+                end
+            end
+            self._connections = activeConnections
+        end
+    end
+    return conn
+end
+
+function superMegaAwesomeLibrary:RegisterControl(flag, getter, setter)
+    if type(flag) ~= "string" or flag == "" then return end
+    if type(getter) ~= "function" or type(setter) ~= "function" then return end
+    self._trackedControls[flag] = {
+        get = getter,
+        set = setter
+    }
+end
+
+function superMegaAwesomeLibrary:EnableSmoothScrolling(scrollFrame, smoothSpeed)
+    if not scrollFrame or self._smoothScrollFrames[scrollFrame] then return end
+    self._smoothScrollFrames[scrollFrame] = {
+        targetY = scrollFrame.CanvasPosition.Y,
+        internal = false,
+        speed = smoothSpeed or 18
+    }
+    scrollFrame.ScrollingDirection = Enum.ScrollingDirection.Y
+    scrollFrame.ElasticBehavior = Enum.ElasticBehavior.WhenScrollable
+    scrollFrame.ScrollBarImageTransparency = 0.25
+    self:_TrackConnection(scrollFrame:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
+        local state = self._smoothScrollFrames[scrollFrame]
+        if not state or state.internal then return end
+        state.targetY = scrollFrame.CanvasPosition.Y
+    end))
+end
+
+function superMegaAwesomeLibrary:ApplySearchFilter(rawQuery)
+    local query = normalizeSearchText(rawQuery)
+    self._searchQuery = query
+    local firstVisibleTab = nil
+    
+    for _, section in ipairs(self.sectionsAreAwesome) do
+        local sectionHasVisibleContent = false
+        for _, tab in ipairs(section.tabsInSection) do
+            local tabName = normalizeSearchText(tab.tabNameForSearch)
+            local tabMatch = query == "" or string.find(tabName, query, 1, true) ~= nil
+            local groupMatch = false
+            
+            for _, group in ipairs(tab.groupsInTab) do
+                local name = normalizeSearchText(group.groupNameForSearch)
+                local visible = query == "" or tabMatch or string.find(name, query, 1, true) ~= nil
+                if group.mainFrame then
+                    group.mainFrame.Visible = visible
+                end
+                if visible then
+                    groupMatch = true
+                end
+            end
+            
+            local tabVisible = query == "" or tabMatch or groupMatch
+            tab.isFilteredVisible = tabVisible
+            if tab.buttonFrame then
+                tab.buttonFrame.Visible = tabVisible
+                if tab.defaultButtonSize then
+                    tab.buttonFrame.Size = tabVisible and tab.defaultButtonSize or UDim2.new(tab.defaultButtonSize.X.Scale, tab.defaultButtonSize.X.Offset, tab.defaultButtonSize.Y.Scale, 0)
+                end
+            end
+            if tabVisible and not firstVisibleTab then
+                firstVisibleTab = tab
+            end
+            if tabVisible then
+                sectionHasVisibleContent = true
+            end
+        end
+        
+        if section.containerFrame then
+            section.containerFrame.Visible = sectionHasVisibleContent or query == ""
+        end
+    end
+    
+    if self.currentTabYay and not self.currentTabYay.isFilteredVisible then
+        if firstVisibleTab then
+            firstVisibleTab:Activate()
+        else
+            self.currentTabYay:Deactivate()
+            self.currentTabYay = nil
+        end
+    elseif not self.currentTabYay and firstVisibleTab then
+        firstVisibleTab:Activate()
+    end
+end
+
+function superMegaAwesomeLibrary:SaveConfig(fileName)
+    if not writefile or not isfolder or not makefolder then
+        return false, "writefile/makefolder APIs are unavailable in this executor."
+    end
+    
+    local folder = "FlowUIConfigs"
+    if not isfolder(folder) then
+        makefolder(folder)
+    end
+    
+    local configName = sanitizeConfigName(fileName)
+    local payload = {
+        version = 1,
+        ui = self.config.Name,
+        controls = {}
+    }
+    
+    for flag, control in pairs(self._trackedControls) do
+        local ok, value = pcall(control.get)
+        if ok then
+            payload.controls[flag] = serializeConfigValue(value)
+        end
+    end
+    
+    local encoded = httpServiceNoCap:JSONEncode(payload)
+    writefile(folder .. "/" .. configName .. ".json", encoded)
+    return true
+end
+
+function superMegaAwesomeLibrary:LoadConfig(fileName)
+    if not readfile or not isfile then
+        return false, "readfile/isfile APIs are unavailable in this executor."
+    end
+    
+    local folder = "FlowUIConfigs"
+    local configName = sanitizeConfigName(fileName)
+    local path = folder .. "/" .. configName .. ".json"
+    if not isfile(path) then
+        return false, "Config file not found: " .. path
+    end
+    
+    local okDecode, data = pcall(function()
+        return httpServiceNoCap:JSONDecode(readfile(path))
+    end)
+    if not okDecode or type(data) ~= "table" or type(data.controls) ~= "table" then
+        return false, "Invalid config JSON format."
+    end
+    
+    for flag, rawValue in pairs(data.controls) do
+        local control = self._trackedControls[flag]
+        if control then
+            local decodedValue = deserializeConfigValue(rawValue)
+            pcall(control.set, decodedValue)
+        end
+    end
+    
+    return true
 end
 
 function superMegaAwesomeLibrary:CreateUIBecauseWeNeedIt()
@@ -161,12 +388,43 @@ function superMegaAwesomeLibrary:CreateUIBecauseWeNeedIt()
     self:CreateNotificationHolderForCoolNotifs()
     self:CreateMobileToggleButton()
     
-    thisInputServiceGoesHard.InputBegan:Connect(function(input, gameProcessed)
+    self:_TrackConnection(thisInputServiceGoesHard.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
         if input.KeyCode == self.toggleKeyCode then
             self:ToggleUI()
         end
-    end)
+    end))
+    
+    self:_TrackConnection(runServiceMoreLikeWalkService.RenderStepped:Connect(function(dt)
+        if self._destroyed then return end
+        
+        table.insert(self._fpsRollingWindow, dt)
+        self._fpsRollingTotal = self._fpsRollingTotal + dt
+        if #self._fpsRollingWindow > self._fpsRollingSize then
+            self._fpsRollingTotal = self._fpsRollingTotal - table.remove(self._fpsRollingWindow, 1)
+        end
+        if self._fpsRollingTotal > 0 then
+            self._latestFPSValue = math.clamp(math.floor((#self._fpsRollingWindow / self._fpsRollingTotal) + 0.5), 1, 360)
+        end
+        
+        for scrollingFrame, state in pairs(self._smoothScrollFrames) do
+            if not scrollingFrame or not scrollingFrame.Parent then
+                self._smoothScrollFrames[scrollingFrame] = nil
+            else
+                local currentY = scrollingFrame.CanvasPosition.Y
+                local goalY = state.targetY
+                local diff = goalY - currentY
+                if math.abs(diff) > 0.05 then
+                    state.internal = true
+                    local alpha = math.clamp(dt * state.speed, 0, 1)
+                    scrollingFrame.CanvasPosition = Vector2.new(scrollingFrame.CanvasPosition.X, currentY + diff * alpha)
+                    state.internal = false
+                elseif state.internal then
+                    state.internal = false
+                end
+            end
+        end
+    end))
 end
 
 function superMegaAwesomeLibrary:ToggleUI()
@@ -272,88 +530,10 @@ function superMegaAwesomeLibrary:CreateMobileToggleButton()
         smoothMoveGoWoosh(glowEffect, {ImageTransparency = 0.7}, 0.2)
     end)
     
-    makeDraggableCuzWeCan(self.mobileToggleFrame)
+    makeDraggableCuzWeCan(self.mobileToggleFrame, nil, self)
 end
 
 function superMegaAwesomeLibrary:CreateWatermarkBecauseWeCool()
-    local hubNameWidth = howWideIsThisText(self.config.Name, 14, Enum.Font.GothamSemibold)
-    local initialText = self.config.Name .. ' | 00:00:00 | 60 FPS'
-    local initialWidth = howWideIsThisText(initialText, 14, Enum.Font.GothamSemibold) + 45
-    
-    self.watermarkFrame = makeThingExist('Frame', {
-        Name = 'WatermarkCuzWeNeedFlexing',
-        BackgroundColor3 = Color3.fromRGB(16, 16, 16),
-        Position = UDim2.new(0.01, 0, 0.02, 0),
-        BorderColor3 = Color3.new(),
-        BorderSizePixel = 0,
-        Size = UDim2.new(0, initialWidth * mobileScaleFactor, 0, 36 * mobileScaleFactor),
-        Parent = self.screenGuiYay
-    })
-    
-    makeThingExist('UICorner', {
-        Name = 'RoundedCornersAreSexy',
-        CornerRadius = UDim.new(0, 7),
-        Parent = self.watermarkFrame
-    })
-    
-    local watermarkIconYay = makeThingExist('ImageLabel', {
-        Name = 'IconGoesHere',
-        BorderColor3 = Color3.new(),
-        BackgroundColor3 = Color3.new(1, 1, 1),
-        Image = 'rbxassetid://10723375250',
-        BackgroundTransparency = 1,
-        Position = UDim2.new(0, 11, 0.5, -7.5 * mobileScaleFactor),
-        BorderSizePixel = 0,
-        Size = UDim2.new(0, 15 * mobileScaleFactor, 0, 15 * mobileScaleFactor),
-        Parent = self.watermarkFrame
-    })
-    
-    makeThingExist('UIAspectRatioConstraint', {
-        Name = 'KeepItSquare',
-        Parent = watermarkIconYay
-    })
-    
-    self.watermarkTextLabel = makeThingExist('TextLabel', {
-        Name = 'TextGoesHereToo',
-        FontFace = Font.new('rbxasset://fonts/families/GothamSSm.json', Enum.FontWeight.SemiBold, Enum.FontStyle.Normal),
-        TextColor3 = Color3.new(1, 1, 1),
-        Text = initialText,
-        BackgroundColor3 = Color3.new(1, 1, 1),
-        BackgroundTransparency = 1,
-        Position = UDim2.new(0, 32, 0, 0),
-        BorderSizePixel = 0,
-        BorderColor3 = Color3.new(),
-        TextSize = 14 * mobileScaleFactor,
-        Size = UDim2.new(1, -40, 1, 0),
-        TextXAlignment = Enum.TextXAlignment.Left,
-        Parent = self.watermarkFrame
-    })
-    
-    makeThingExist('UIPadding', {
-        Name = 'PaddingForDays',
-        PaddingTop = UDim.new(0, 2),
-        Parent = self.watermarkTextLabel
-    })
-    
-    makeDraggableCuzWeCan(self.watermarkFrame)
-    
-    task.spawn(function()
-        while task.wait(0.5) do
-            if self.watermarkFrame and self.watermarkFrame.Parent and self.watermarkTextLabel and self.watermarkTextLabel.Parent then
-                local timeNow = os.date('%H:%M:%S')
-                local fpsCount = math.floor(1 / runServiceMoreLikeWalkService.RenderStepped:Wait())
-                local newText = self.config.Name .. ' | ' .. timeNow .. ' | ' .. fpsCount .. ' FPS'
-                self.watermarkTextLabel.Text = newText
-                
-                local newWidth = howWideIsThisText(newText, 14 * mobileScaleFactor, Enum.Font.GothamSemibold) + 45
-                smoothMoveGoWoosh(self.watermarkFrame, {Size = UDim2.new(0, newWidth, 0, 36 * mobileScaleFactor)}, 0.2)
-            end
-        end
-    end)
-end
-
-function superMegaAwesomeLibrary:CreateWatermarkBecauseWeCool()
-    local hubNameWidth = howWideIsThisText(self.config.Name, 14, Enum.Font.GothamSemibold)
     local initialText = self.config.Name .. " | 00:00:00 | 60 FPS"
     local initialWidth = howWideIsThisText(initialText, 14, Enum.Font.GothamSemibold) + 45
     
@@ -383,17 +563,18 @@ function superMegaAwesomeLibrary:CreateWatermarkBecauseWeCool()
         Parent = self.watermarkFrame
     })
     
-    makeDraggableCuzWeCan(self.watermarkFrame)
+    makeDraggableCuzWeCan(self.watermarkFrame, nil, self)
     
     task.spawn(function()
-        while task.wait(0.5) do
-            if self.watermarkFrame and self.watermarkFrame.Parent then
+        while not self._destroyed do
+            task.wait(0.25)
+            if self.watermarkFrame and self.watermarkFrame.Parent and self.watermarkTextLabel and self.watermarkTextLabel.Parent then
                 local timeNow = os.date("%H:%M:%S")
-                local fpsCount = math.floor(1 / runServiceMoreLikeWalkService.RenderStepped:Wait())
+                local fpsCount = self._latestFPSValue > 0 and self._latestFPSValue or 0
                 local newText = self.config.Name .. " | " .. timeNow .. " | " .. fpsCount .. " FPS"
                 self.watermarkTextLabel.Text = newText
                 local newWidth = howWideIsThisText(newText, 14 * mobileScaleFactor, Enum.Font.GothamSemibold) + 45
-                smoothMoveGoWoosh(self.watermarkFrame, {Size = UDim2.new(0, newWidth, 0, 36 * mobileScaleFactor)}, 0.2)
+                smoothMoveGoWoosh(self.watermarkFrame, {Size = UDim2.new(0, newWidth, 0, 36 * mobileScaleFactor)}, 0.18)
             end
         end
     end)
@@ -419,7 +600,7 @@ function superMegaAwesomeLibrary:CreateMainFrameYay()
         Size = UDim2.new(1, 0, 0, 65 * mobileScaleFactor), Parent = self.mainFrameYay
     })
     
-    makeDraggableCuzWeCan(self.mainFrameYay, self.dragBarThing)
+    makeDraggableCuzWeCan(self.mainFrameYay, self.dragBarThing, self)
     
     local hubNameWidth = howWideIsThisText(self.config.Name, 17 * mobileScaleFactor, Enum.Font.GothamSemibold)
     
@@ -469,6 +650,40 @@ function superMegaAwesomeLibrary:CreateMainFrameYay()
         TextSize = 14 * mobileScaleFactor, Size = UDim2.new(0, 200, 0, 18 * mobileScaleFactor),
         TextXAlignment = Enum.TextXAlignment.Left, Parent = self.mainFrameYay
     })
+
+    self.searchFrame = makeThingExist("Frame", {
+        BackgroundColor3 = Color3.fromRGB(22, 22, 22),
+        Position = UDim2.new(0, 524 * mobileScaleFactor, 0, 16 * mobileScaleFactor),
+        Size = UDim2.new(0, 214 * mobileScaleFactor, 0, 28 * mobileScaleFactor),
+        Parent = self.mainFrameYay
+    })
+    makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = self.searchFrame})
+    makeThingExist("UIStroke", {Color = Color3.fromRGB(38, 38, 38), Parent = self.searchFrame})
+    makeThingExist("ImageLabel", {
+        Image = "rbxassetid://10734943674",
+        ImageColor3 = Color3.fromRGB(120, 120, 120),
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0, 8, 0.5, -7 * mobileScaleFactor),
+        Size = UDim2.new(0, 14 * mobileScaleFactor, 0, 14 * mobileScaleFactor),
+        Parent = self.searchFrame
+    })
+    self.searchBox = makeThingExist("TextBox", {
+        FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
+        Text = "",
+        PlaceholderText = "Search tabs/groups...",
+        PlaceholderColor3 = Color3.fromRGB(80, 80, 80),
+        TextColor3 = Color3.fromRGB(210, 210, 210),
+        TextSize = 13 * mobileScaleFactor,
+        BackgroundTransparency = 1,
+        ClearTextOnFocus = false,
+        Position = UDim2.new(0, 28 * mobileScaleFactor, 0, 0),
+        Size = UDim2.new(1, -34 * mobileScaleFactor, 1, 0),
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = self.searchFrame
+    })
+    self:_TrackConnection(self.searchBox:GetPropertyChangedSignal("Text"):Connect(function()
+        self:ApplySearchFilter(self.searchBox.Text)
+    end))
     
     self.sectionHolderScroll = makeThingExist("ScrollingFrame", {
         BackgroundTransparency = 1, Position = UDim2.new(0, 17, 0, 75 * mobileScaleFactor),
@@ -479,6 +694,7 @@ function superMegaAwesomeLibrary:CreateMainFrameYay()
     
     makeThingExist("UIPadding", {PaddingLeft = UDim.new(0, 2), PaddingRight = UDim.new(0, 2), PaddingTop = UDim.new(0, 2), Parent = self.sectionHolderScroll})
     self.sectionLayoutThing = makeThingExist("UIListLayout", {Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder, Parent = self.sectionHolderScroll})
+    self:EnableSmoothScrolling(self.sectionHolderScroll, 16)
     
     self.contentHolderFrame = makeThingExist("Frame", {
         BackgroundTransparency = 1, Position = UDim2.new(0, 198 * mobileScaleFactor, 0, 62 * mobileScaleFactor),
@@ -614,9 +830,9 @@ function superMegaAwesomeLibrary:CreateSection(config)
         end
     end
     
-    sectionObj.tabLayoutThing:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateContainerSizeYay)
+    self:_TrackConnection(sectionObj.tabLayoutThing:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateContainerSizeYay))
     
-    expandButtonImg.MouseButton1Click:Connect(function()
+    self:_TrackConnection(expandButtonImg.MouseButton1Click:Connect(function()
         sectionObj.isExpanded = not sectionObj.isExpanded
         smoothMoveGoWoosh(expandButtonImg, {Rotation = sectionObj.isExpanded and 0 or -90}, 0.25)
         if sectionObj.isExpanded then
@@ -625,7 +841,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
         else
             smoothMoveGoWoosh(sectionObj.containerFrame, {Size = UDim2.new(0, 158 * mobileScaleFactor, 0, 32 * mobileScaleFactor)}, 0.25)
         end
-    end)
+    end))
 
     function sectionObj:AddTab(tabConfig)
         tabConfig = tabConfig or {}
@@ -634,14 +850,16 @@ function superMegaAwesomeLibrary:CreateSection(config)
         tabConfig.Icon = tabConfig.Icon or "rbxassetid://94219370057308"
         
         local tabObj = {}
+        tabObj.tabNameForSearch = tabConfig.Name
         tabObj.groupsInTab = {}
         tabObj.groupPositions = {Left = 0, Right = 0}
         tabObj.isActive = false
         tabObj.Library = sectionObj.Library
+        tabObj.defaultButtonSize = UDim2.new(0, 136 * mobileScaleFactor, 0, 28 * mobileScaleFactor)
         
         tabObj.buttonFrame = makeThingExist("Frame", {
             BackgroundColor3 = sectionObj.Library.config.AccentColor, BackgroundTransparency = 1,
-            Size = UDim2.new(0, 136 * mobileScaleFactor, 0, 28 * mobileScaleFactor), ClipsDescendants = true, Parent = sectionObj.tabHolderFrame
+            Size = tabObj.defaultButtonSize, ClipsDescendants = true, Parent = sectionObj.tabHolderFrame
         })
         makeThingExist("UICorner", {CornerRadius = UDim.new(0, 7), Parent = tabObj.buttonFrame})
         
@@ -668,6 +886,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
             CanvasSize = UDim2.new(0, 540 * mobileScaleFactor, 0, 0), Visible = false,
             Parent = sectionObj.Library.contentHolderFrame
         })
+        sectionObj.Library:EnableSmoothScrolling(tabObj.contentScroll, 18)
         
         tabObj.leftColumnFrame = makeThingExist("Frame", {BackgroundTransparency = 1, Size = UDim2.new(0, 262 * mobileScaleFactor, 0, 1000), Parent = tabObj.contentScroll})
         tabObj.rightColumnFrame = makeThingExist("Frame", {BackgroundTransparency = 1, Position = UDim2.new(0, 272 * mobileScaleFactor, 0, 0), Size = UDim2.new(0, 262 * mobileScaleFactor, 0, 1000), Parent = tabObj.contentScroll})
@@ -722,9 +941,13 @@ function superMegaAwesomeLibrary:CreateSection(config)
             groupConfig.Icon = groupConfig.Icon or "rbxassetid://10723427199"
             
             local groupObj = {}
+            groupObj.groupNameForSearch = groupConfig.Name
             groupObj.elementsInGroup = {}
             groupObj.Library = tabObj.Library
             groupObj.elementYPos = 35 * mobileScaleFactor
+            local function createAutoFlag(elementName)
+                return tostring(tabObj.tabNameForSearch) .. "." .. tostring(groupObj.groupNameForSearch) .. "." .. tostring(elementName or "Value")
+            end
             
             local parentColumn = groupConfig.Side == "Left" and tabObj.leftColumnFrame or tabObj.rightColumnFrame
             local groupWidth = 260 * mobileScaleFactor
@@ -768,6 +991,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 toggleConfig.Name = toggleConfig.Name or "Toggle"
                 toggleConfig.Default = toggleConfig.Default or false
                 toggleConfig.Callback = toggleConfig.Callback or function() end
+                toggleConfig.Flag = toggleConfig.Flag or createAutoFlag(toggleConfig.Name)
                 
                 local toggleObj = {}
                 toggleObj.value = toggleConfig.Default
@@ -809,9 +1033,18 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     end
                     toggleConfig.Callback(toggleObj.value)
                 end
+
+                function toggleObj:Get()
+                    return toggleObj.value
+                end
                 
                 toggleClickButton.MouseButton1Click:Connect(function() toggleObj:Set(not toggleObj.value) end)
                 if toggleConfig.Default then toggleConfig.Callback(true) end
+                groupObj.Library:RegisterControl(toggleConfig.Flag, function()
+                    return toggleObj:Get()
+                end, function(value)
+                    toggleObj:Set(value == true)
+                end)
                 
                 groupObj.elementYPos = groupObj.elementYPos + 28 * mobileScaleFactor
                 updateGroupSizeYay()
@@ -827,6 +1060,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 sliderConfig.Default = sliderConfig.Default or sliderConfig.Min
                 sliderConfig.Increment = sliderConfig.Increment or 1
                 sliderConfig.Callback = sliderConfig.Callback or function() end
+                sliderConfig.Flag = sliderConfig.Flag or createAutoFlag(sliderConfig.Name)
                 
                 local sliderObj = {}
                 sliderObj.value = sliderConfig.Default
@@ -874,21 +1108,30 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     sliderObj.valueLabelText.Text = tostring(value) .. " / " .. tostring(sliderConfig.Max)
                     sliderConfig.Callback(value)
                 end
+
+                function sliderObj:Get()
+                    return sliderObj.value
+                end
                 
                 local isDraggingSlider = false
                 sliderClickButton.MouseButton1Down:Connect(function() isDraggingSlider = true end)
-                thisInputServiceGoesHard.InputEnded:Connect(function(input)
+                groupObj.Library:_TrackConnection(thisInputServiceGoesHard.InputEnded:Connect(function(input)
                     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then isDraggingSlider = false end
-                end)
-                thisInputServiceGoesHard.InputChanged:Connect(function(input)
+                end))
+                groupObj.Library:_TrackConnection(thisInputServiceGoesHard.InputChanged:Connect(function(input)
                     if isDraggingSlider and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
                         local percentage = math.clamp((input.Position.X - sliderObj.backgroundFrame.AbsolutePosition.X) / sliderObj.backgroundFrame.AbsoluteSize.X, 0, 1)
                         local value = sliderConfig.Min + (sliderConfig.Max - sliderConfig.Min) * percentage
                         sliderObj:Set(value)
                     end
-                end)
+                end))
                 
                 if sliderConfig.Default ~= sliderConfig.Min then sliderConfig.Callback(sliderConfig.Default) end
+                groupObj.Library:RegisterControl(sliderConfig.Flag, function()
+                    return sliderObj:Get()
+                end, function(value)
+                    sliderObj:Set(tonumber(value) or sliderConfig.Min)
+                end)
                 groupObj.elementYPos = groupObj.elementYPos + 40 * mobileScaleFactor
                 updateGroupSizeYay()
                 table.insert(groupObj.elementsInGroup, sliderObj)
@@ -958,6 +1201,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 keybindConfig.Default = keybindConfig.Default or Enum.KeyCode.Unknown
                 keybindConfig.Callback = keybindConfig.Callback or function() end
                 keybindConfig.ChangedCallback = keybindConfig.ChangedCallback or function() end
+                keybindConfig.Flag = keybindConfig.Flag or createAutoFlag(keybindConfig.Name)
                 
                 local keybindObj = {}
                 keybindObj.value = keybindConfig.Default
@@ -1017,6 +1261,10 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     updateKeybindSizeYay(keyText)
                     keybindConfig.ChangedCallback(key)
                 end
+
+                function keybindObj:Get()
+                    return keybindObj.value
+                end
                 
                 keybindClickButton.MouseButton1Click:Connect(function()
                     keybindObj.isListening = true
@@ -1025,7 +1273,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     smoothMoveGoWoosh(keybindObj.buttonFrame, {BackgroundColor3 = Color3.fromRGB(48, 48, 48)}, 0.2)
                 end)
                 
-                thisInputServiceGoesHard.InputBegan:Connect(function(input, gameProcessed)
+                groupObj.Library:_TrackConnection(thisInputServiceGoesHard.InputBegan:Connect(function(input, gameProcessed)
                     if keybindObj.isListening then
                         if input.UserInputType == Enum.UserInputType.Keyboard then
                             keybindObj.isListening = false
@@ -1035,13 +1283,20 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     elseif not gameProcessed and input.UserInputType == Enum.UserInputType.Keyboard then
                         if input.KeyCode == keybindObj.value then keybindConfig.Callback() end
                     end
-                end)
+                end))
                 
                 keybindClickButton.MouseEnter:Connect(function()
                     if not keybindObj.isListening then smoothMoveGoWoosh(keybindObj.buttonFrame, {BackgroundColor3 = Color3.fromRGB(48, 48, 48)}, 0.2) end
                 end)
                 keybindClickButton.MouseLeave:Connect(function()
                     if not keybindObj.isListening then smoothMoveGoWoosh(keybindObj.buttonFrame, {BackgroundColor3 = Color3.fromRGB(32, 32, 32)}, 0.2) end
+                end)
+                groupObj.Library:RegisterControl(keybindConfig.Flag, function()
+                    return keybindObj:Get()
+                end, function(value)
+                    if typeof(value) == "EnumItem" and value.EnumType == Enum.KeyCode then
+                        keybindObj:Set(value)
+                    end
                 end)
                 
                 groupObj.elementYPos = groupObj.elementYPos + 28 * mobileScaleFactor
@@ -1058,6 +1313,8 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 keybindToggleConfig.Callback = keybindToggleConfig.Callback or function() end
                 keybindToggleConfig.ToggleCallback = keybindToggleConfig.ToggleCallback or function() end
                 keybindToggleConfig.ChangedCallback = keybindToggleConfig.ChangedCallback or function() end
+                keybindToggleConfig.Flag = keybindToggleConfig.Flag or createAutoFlag(keybindToggleConfig.Name .. ".Key")
+                keybindToggleConfig.ToggleFlag = keybindToggleConfig.ToggleFlag or createAutoFlag(keybindToggleConfig.Name .. ".Enabled")
                 
                 local keybindToggleObj = {}
                 keybindToggleObj.keyValue = keybindToggleConfig.Default
@@ -1141,6 +1398,14 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     updateKeybindSizeYay(keyText)
                     keybindToggleConfig.ChangedCallback(key)
                 end
+
+                function keybindToggleObj:GetKey()
+                    return keybindToggleObj.keyValue
+                end
+
+                function keybindToggleObj:GetToggle()
+                    return keybindToggleObj.toggleValue
+                end
                 
                 toggleClickButton.MouseButton1Click:Connect(function() keybindToggleObj:SetToggle(not keybindToggleObj.toggleValue) end)
                 keybindClickButton.MouseButton1Click:Connect(function()
@@ -1150,7 +1415,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     smoothMoveGoWoosh(keybindToggleObj.keybindButtonFrame, {BackgroundColor3 = Color3.fromRGB(48, 48, 48)}, 0.2)
                 end)
                 
-                thisInputServiceGoesHard.InputBegan:Connect(function(input, gameProcessed)
+                groupObj.Library:_TrackConnection(thisInputServiceGoesHard.InputBegan:Connect(function(input, gameProcessed)
                     if keybindToggleObj.isListening then
                         if input.UserInputType == Enum.UserInputType.Keyboard then
                             keybindToggleObj.isListening = false
@@ -1162,12 +1427,24 @@ function superMegaAwesomeLibrary:CreateSection(config)
                             keybindToggleConfig.Callback()
                         end
                     end
-                end)
+                end))
                 
                 keybindClickButton.MouseEnter:Connect(function() if not keybindToggleObj.isListening then smoothMoveGoWoosh(keybindToggleObj.keybindButtonFrame, {BackgroundColor3 = Color3.fromRGB(48, 48, 48)}, 0.2) end end)
                 keybindClickButton.MouseLeave:Connect(function() if not keybindToggleObj.isListening then smoothMoveGoWoosh(keybindToggleObj.keybindButtonFrame, {BackgroundColor3 = Color3.fromRGB(32, 32, 32)}, 0.2) end end)
                 
                 if keybindToggleConfig.ToggleDefault then keybindToggleConfig.ToggleCallback(true) end
+                groupObj.Library:RegisterControl(keybindToggleConfig.Flag, function()
+                    return keybindToggleObj:GetKey()
+                end, function(value)
+                    if typeof(value) == "EnumItem" and value.EnumType == Enum.KeyCode then
+                        keybindToggleObj:SetKey(value)
+                    end
+                end)
+                groupObj.Library:RegisterControl(keybindToggleConfig.ToggleFlag, function()
+                    return keybindToggleObj:GetToggle()
+                end, function(value)
+                    keybindToggleObj:SetToggle(value == true)
+                end)
                 groupObj.elementYPos = groupObj.elementYPos + 28 * mobileScaleFactor
                 updateGroupSizeYay()
                 table.insert(groupObj.elementsInGroup, keybindToggleObj)
@@ -1180,6 +1457,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 dropdownConfig.Options = dropdownConfig.Options or {"Option 1", "Option 2", "Option 3"}
                 dropdownConfig.Default = dropdownConfig.Default or dropdownConfig.Options[1]
                 dropdownConfig.Callback = dropdownConfig.Callback or function() end
+                dropdownConfig.Flag = dropdownConfig.Flag or createAutoFlag(dropdownConfig.Name)
                 
                 local dropdownObj = {}
                 dropdownObj.value = dropdownConfig.Default
@@ -1240,6 +1518,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     ScrollBarImageColor3 = Color3.fromRGB(80, 80, 80), CanvasSize = UDim2.new(0, 0, 0, 0),
                     ZIndex = 10000, Parent = dropdownObj.optionHolderFrame
                 })
+                groupObj.Library:EnableSmoothScrolling(dropdownObj.optionScrollFrame, 22)
                 
                 dropdownObj.optionContainerFrame = makeThingExist("Frame", {
                     BackgroundTransparency = 1, Size = UDim2.new(1, -6, 0, 0),
@@ -1259,11 +1538,15 @@ function superMegaAwesomeLibrary:CreateSection(config)
                         dropdownObj.optionHolderFrame.Size = UDim2.new(0, 140 * mobileScaleFactor, 0, 0)
                         dropdownObj.optionHolderFrame.Visible = false
                         dropdownObj.arrowImg.Rotation = 0
+                        dropdownObj.buttonFrame.BackgroundColor3 = Color3.fromRGB(32, 32, 32)
+                        dropdownStrokeThing.Color = Color3.fromRGB(44, 44, 44)
                         return
                     end
-                    smoothMoveGoWoosh(dropdownObj.optionHolderFrame, {Size = UDim2.new(0, 140 * mobileScaleFactor, 0, 0)}, 0.2)
+                    smoothMoveGoWoosh(dropdownObj.optionHolderFrame, {Size = UDim2.new(0, 140 * mobileScaleFactor, 0, 0)}, 0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
                     smoothMoveGoWoosh(dropdownObj.arrowImg, {Rotation = 0}, 0.2)
-                    task.delay(0.2, function()
+                    smoothMoveGoWoosh(dropdownObj.buttonFrame, {BackgroundColor3 = Color3.fromRGB(32, 32, 32)}, 0.18)
+                    smoothMoveGoWoosh(dropdownStrokeThing, {Color = Color3.fromRGB(44, 44, 44)}, 0.18)
+                    task.delay(0.22, function()
                         if dropdownObj.optionHolderFrame.Parent and not dropdownObj.isOpen then
                             dropdownObj.optionHolderFrame.Visible = false
                         end
@@ -1322,17 +1605,18 @@ function superMegaAwesomeLibrary:CreateSection(config)
                         dropdownObj.optionHolderFrame.Visible = true
                         local contentHeight = (35 + (#dropdownConfig.Options * 22)) * mobileScaleFactor
                         local height = math.min(contentHeight, maxDropdownHeight)
-                        smoothMoveGoWoosh(dropdownObj.optionHolderFrame, {Size = UDim2.new(0, 140 * mobileScaleFactor, 0, height)}, 0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-                        smoothMoveGoWoosh(dropdownObj.arrowImg, {Rotation = 180}, 0.2)
+                        smoothMoveGoWoosh(dropdownObj.optionHolderFrame, {Size = UDim2.new(0, 140 * mobileScaleFactor, 0, height)}, 0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+                        smoothMoveGoWoosh(dropdownObj.arrowImg, {Rotation = 180}, 0.24, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
                         -- Start tracking position while dropdown is open
                         if dropdownPositionUpdateConn then dropdownPositionUpdateConn:Disconnect() end
-                        dropdownPositionUpdateConn = runServiceMoreLikeWalkService.RenderStepped:Connect(function()
+                        dropdownPositionUpdateConn = groupObj.Library:_TrackConnection(runServiceMoreLikeWalkService.RenderStepped:Connect(function()
                             if dropdownObj.isOpen then
                                 updateDropdownPositionYay()
                             else
                                 dropdownPositionUpdateConn:Disconnect()
+                                dropdownPositionUpdateConn = nil
                             end
-                        end)
+                        end))
                     else
                         closeDropdown(false)
                     end
@@ -1350,6 +1634,8 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 end)
                 
                 function dropdownObj:Set(value)
+                    if value == nil then return end
+                    value = tostring(value)
                     dropdownObj.value = value
                     dropdownObj.selectedLabelText.Text = value
                     local newWidth = math.max(70 * mobileScaleFactor, howWideIsThisText(value, 12 * mobileScaleFactor) + 30 * mobileScaleFactor)
@@ -1357,6 +1643,10 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     dropdownObj.buttonFrame.Position = UDim2.new(1, -newWidth - 10, 0, yPosition)
                     createOptionsYay()
                     dropdownConfig.Callback(value)
+                end
+
+                function dropdownObj:Get()
+                    return dropdownObj.value
                 end
                 
                 function dropdownObj:UpdateOptions(newOptions)
@@ -1367,6 +1657,13 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 function dropdownObj:Close()
                     closeDropdown(true)
                 end
+                groupObj.Library:RegisterControl(dropdownConfig.Flag, function()
+                    return dropdownObj:Get()
+                end, function(value)
+                    if value ~= nil then
+                        dropdownObj:Set(value)
+                    end
+                end)
                 
                 groupObj.elementYPos = groupObj.elementYPos + 28 * mobileScaleFactor
                 updateGroupSizeYay()
@@ -1380,6 +1677,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 multiDropdownConfig.Options = multiDropdownConfig.Options or {"Option 1", "Option 2", "Option 3"}
                 multiDropdownConfig.Default = multiDropdownConfig.Default or {}
                 multiDropdownConfig.Callback = multiDropdownConfig.Callback or function() end
+                multiDropdownConfig.Flag = multiDropdownConfig.Flag or createAutoFlag(multiDropdownConfig.Name)
                 
                 local multiDropdownObj = {}
                 multiDropdownObj.selectedValues = {}
@@ -1400,6 +1698,9 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     for option, isSelected in pairs(multiDropdownObj.selectedValues) do
                         if isSelected then table.insert(selected, option) end
                     end
+                    table.sort(selected, function(a, b)
+                        return tostring(a) < tostring(b)
+                    end)
                     if #selected == 0 then return "None"
                     elseif #selected == 1 then return selected[1]
                     elseif #selected <= 2 then return table.concat(selected, ", ")
@@ -1411,6 +1712,9 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     for option, isSelected in pairs(multiDropdownObj.selectedValues) do
                         if isSelected then table.insert(arr, option) end
                     end
+                    table.sort(arr, function(a, b)
+                        return tostring(a) < tostring(b)
+                    end)
                     return arr
                 end
                 
@@ -1460,6 +1764,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     ScrollBarImageColor3 = Color3.fromRGB(80, 80, 80), CanvasSize = UDim2.new(0, 0, 0, 0),
                     ZIndex = 10000, Parent = multiDropdownObj.optionHolderFrame
                 })
+                groupObj.Library:EnableSmoothScrolling(multiDropdownObj.optionScrollFrame, 22)
                 
                 multiDropdownObj.optionContainerFrame = makeThingExist("Frame", {
                     BackgroundTransparency = 1, Size = UDim2.new(1, -6, 0, 0),
@@ -1479,11 +1784,15 @@ function superMegaAwesomeLibrary:CreateSection(config)
                         multiDropdownObj.optionHolderFrame.Size = UDim2.new(0, 160 * mobileScaleFactor, 0, 0)
                         multiDropdownObj.optionHolderFrame.Visible = false
                         multiDropdownObj.arrowImg.Rotation = 0
+                        multiDropdownObj.buttonFrame.BackgroundColor3 = Color3.fromRGB(32, 32, 32)
+                        dropdownStrokeThing.Color = Color3.fromRGB(44, 44, 44)
                         return
                     end
-                    smoothMoveGoWoosh(multiDropdownObj.optionHolderFrame, {Size = UDim2.new(0, 160 * mobileScaleFactor, 0, 0)}, 0.2)
-                    smoothMoveGoWoosh(multiDropdownObj.arrowImg, {Rotation = 0}, 0.2)
-                    task.delay(0.2, function()
+                    smoothMoveGoWoosh(multiDropdownObj.optionHolderFrame, {Size = UDim2.new(0, 160 * mobileScaleFactor, 0, 0)}, 0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
+                    smoothMoveGoWoosh(multiDropdownObj.arrowImg, {Rotation = 0}, 0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
+                    smoothMoveGoWoosh(multiDropdownObj.buttonFrame, {BackgroundColor3 = Color3.fromRGB(32, 32, 32)}, 0.18)
+                    smoothMoveGoWoosh(dropdownStrokeThing, {Color = Color3.fromRGB(44, 44, 44)}, 0.18)
+                    task.delay(0.22, function()
                         if multiDropdownObj.optionHolderFrame.Parent and not multiDropdownObj.isOpen then
                             multiDropdownObj.optionHolderFrame.Visible = false
                         end
@@ -1584,17 +1893,18 @@ function superMegaAwesomeLibrary:CreateSection(config)
                         multiDropdownObj.optionHolderFrame.Visible = true
                         local contentHeight = (38 + (#multiDropdownConfig.Options * 24)) * mobileScaleFactor
                         local height = math.min(contentHeight, maxMultiDropdownHeight)
-                        smoothMoveGoWoosh(multiDropdownObj.optionHolderFrame, {Size = UDim2.new(0, 160 * mobileScaleFactor, 0, height)}, 0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-                        smoothMoveGoWoosh(multiDropdownObj.arrowImg, {Rotation = 180}, 0.2)
+                        smoothMoveGoWoosh(multiDropdownObj.optionHolderFrame, {Size = UDim2.new(0, 160 * mobileScaleFactor, 0, height)}, 0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+                        smoothMoveGoWoosh(multiDropdownObj.arrowImg, {Rotation = 180}, 0.24, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
                         -- Start tracking position while dropdown is open
                         if multiDropdownPositionConn then multiDropdownPositionConn:Disconnect() end
-                        multiDropdownPositionConn = runServiceMoreLikeWalkService.RenderStepped:Connect(function()
+                        multiDropdownPositionConn = groupObj.Library:_TrackConnection(runServiceMoreLikeWalkService.RenderStepped:Connect(function()
                             if multiDropdownObj.isOpen then
                                 updateDropdownPositionYay()
                             else
                                 multiDropdownPositionConn:Disconnect()
+                                multiDropdownPositionConn = nil
                             end
-                        end)
+                        end))
                     else
                         closeMultiDropdown(false)
                     end
@@ -1614,7 +1924,11 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 function multiDropdownObj:Set(values)
                     multiDropdownObj.selectedValues = {}
                     for _, v in ipairs(values) do multiDropdownObj.selectedValues[v] = true end
-                    multiDropdownObj.selectedLabelText.Text = getDisplayText()
+                    local newDisplayText = getDisplayText()
+                    multiDropdownObj.selectedLabelText.Text = newDisplayText
+                    local newWidth = math.max(85 * mobileScaleFactor, howWideIsThisText(newDisplayText, 12 * mobileScaleFactor) + 35 * mobileScaleFactor)
+                    multiDropdownObj.buttonFrame.Size = UDim2.new(0, newWidth, 0, 21 * mobileScaleFactor)
+                    multiDropdownObj.buttonFrame.Position = UDim2.new(1, -newWidth - 10, 0, yPosition)
                     createMultiOptionsYay()
                     multiDropdownConfig.Callback(getSelectedArray())
                 end
@@ -1629,6 +1943,13 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 function multiDropdownObj:Close()
                     closeMultiDropdown(true)
                 end
+                groupObj.Library:RegisterControl(multiDropdownConfig.Flag, function()
+                    return multiDropdownObj:Get()
+                end, function(value)
+                    if type(value) == "table" then
+                        multiDropdownObj:Set(value)
+                    end
+                end)
                 
                 if #multiDropdownConfig.Default > 0 then multiDropdownConfig.Callback(getSelectedArray()) end
                 groupObj.elementYPos = groupObj.elementYPos + 28 * mobileScaleFactor
@@ -1675,6 +1996,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 textInputConfig.Placeholder = textInputConfig.Placeholder or "Enter text..."
                 textInputConfig.Default = textInputConfig.Default or ""
                 textInputConfig.Callback = textInputConfig.Callback or function() end
+                textInputConfig.Flag = textInputConfig.Flag or createAutoFlag(textInputConfig.Name)
                 
                 local textInputObj = {}
                 textInputObj.value = textInputConfig.Default
@@ -1730,6 +2052,12 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 function textInputObj:Get()
                     return textInputObj.value
                 end
+                groupObj.Library:RegisterControl(textInputConfig.Flag, function()
+                    return textInputObj:Get()
+                end, function(value)
+                    textInputObj:Set(tostring(value or ""))
+                    textInputConfig.Callback(textInputObj.value, false)
+                end)
                 
                 groupObj.elementYPos = groupObj.elementYPos + 54 * mobileScaleFactor
                 updateGroupSizeYay()
@@ -1742,6 +2070,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 colorPickerConfig.Name = colorPickerConfig.Name or "Color"
                 colorPickerConfig.Default = colorPickerConfig.Default or Color3.fromRGB(255, 100, 150)
                 colorPickerConfig.Callback = colorPickerConfig.Callback or function() end
+                colorPickerConfig.Flag = colorPickerConfig.Flag or createAutoFlag(colorPickerConfig.Name)
                 
                 local colorPickerObj = {}
                 colorPickerObj.value = colorPickerConfig.Default
@@ -1919,12 +2248,12 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 
                 local svDragging = false
                 svClickBtn.MouseButton1Down:Connect(function() svDragging = true end)
-                thisInputServiceGoesHard.InputEnded:Connect(function(input)
+                groupObj.Library:_TrackConnection(thisInputServiceGoesHard.InputEnded:Connect(function(input)
                     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                         svDragging = false
                     end
-                end)
-                thisInputServiceGoesHard.InputChanged:Connect(function(input)
+                end))
+                groupObj.Library:_TrackConnection(thisInputServiceGoesHard.InputChanged:Connect(function(input)
                     if svDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
                         local absPos, absSize = colorPickerObj.svBox.AbsolutePosition, colorPickerObj.svBox.AbsoluteSize
                         currentS = math.clamp((input.Position.X - absPos.X) / absSize.X, 0, 1)
@@ -1932,7 +2261,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                         colorPickerObj.svCursor.Position = UDim2.new(currentS, -6, 1 - currentV, -6)
                         updateColor()
                     end
-                end)
+                end))
                 
                 -- Hue slider interaction
                 local hueClickBtn = makeThingExist("TextButton", {
@@ -1942,19 +2271,19 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 
                 local hueDragging = false
                 hueClickBtn.MouseButton1Down:Connect(function() hueDragging = true end)
-                thisInputServiceGoesHard.InputEnded:Connect(function(input)
+                groupObj.Library:_TrackConnection(thisInputServiceGoesHard.InputEnded:Connect(function(input)
                     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                         hueDragging = false
                     end
-                end)
-                thisInputServiceGoesHard.InputChanged:Connect(function(input)
+                end))
+                groupObj.Library:_TrackConnection(thisInputServiceGoesHard.InputChanged:Connect(function(input)
                     if hueDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
                         local absPos, absSize = colorPickerObj.hueSlider.AbsolutePosition, colorPickerObj.hueSlider.AbsoluteSize
                         currentH = math.clamp((input.Position.X - absPos.X) / absSize.X, 0, 1)
                         colorPickerObj.hueCursor.Position = UDim2.new(currentH, -7, 0.5, -7)
                         updateColor()
                     end
-                end)
+                end))
                 
                 -- Open/close picker
                 local pickerClickBtn = makeThingExist("TextButton", {
@@ -1976,8 +2305,8 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     end
                     smoothMoveGoWoosh(colorPickerObj.pickerHolder, {
                         Size = UDim2.new(0, 200 * mobileScaleFactor, 0, 0)
-                    }, 0.15)
-                    task.delay(0.15, function()
+                    }, 0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
+                    task.delay(0.2, function()
                         if colorPickerObj.pickerHolder.Parent and not colorPickerObj.isOpen then
                             colorPickerObj.pickerHolder.Visible = false
                         end
@@ -1997,12 +2326,15 @@ function superMegaAwesomeLibrary:CreateSection(config)
                         colorPickerObj.pickerHolder.Visible = true
                         smoothMoveGoWoosh(colorPickerObj.pickerHolder, {
                             Size = UDim2.new(0, 200 * mobileScaleFactor, 0, 210 * mobileScaleFactor)
-                        }, 0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+                        }, 0.26, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
                         if colorPickerPositionConn then colorPickerPositionConn:Disconnect() end
-                        colorPickerPositionConn = runServiceMoreLikeWalkService.RenderStepped:Connect(function()
+                        colorPickerPositionConn = groupObj.Library:_TrackConnection(runServiceMoreLikeWalkService.RenderStepped:Connect(function()
                             if colorPickerObj.isOpen then updatePickerPosition()
-                            else colorPickerPositionConn:Disconnect() end
-                        end)
+                            else
+                                colorPickerPositionConn:Disconnect()
+                                colorPickerPositionConn = nil
+                            end
+                        end))
                     else
                         closeColorPicker(false)
                     end
@@ -2023,6 +2355,13 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 function colorPickerObj:Close()
                     closeColorPicker(true)
                 end
+                groupObj.Library:RegisterControl(colorPickerConfig.Flag, function()
+                    return colorPickerObj:Get()
+                end, function(value)
+                    if typeof(value) == "Color3" then
+                        colorPickerObj:Set(value)
+                    end
+                end)
                 
                 colorPickerConfig.Callback(colorPickerConfig.Default)
                 groupObj.elementYPos = groupObj.elementYPos + 28 * mobileScaleFactor
@@ -2048,6 +2387,10 @@ function superMegaAwesomeLibrary:CreateSection(config)
             sectionObj.containerFrame.Size = UDim2.new(0, 158 * mobileScaleFactor, 0, 32 * mobileScaleFactor + tabsHeight + 9)
         end)
         
+        if sectionObj.Library._searchQuery ~= "" then
+            sectionObj.Library:ApplySearchFilter(sectionObj.Library._searchQuery)
+        end
+        
         return tabObj
     end
     
@@ -2061,7 +2404,51 @@ function superMegaAwesomeLibrary:SetAccentColor(color)
 end
 
 function superMegaAwesomeLibrary:Destroy()
-    if self.screenGuiYay and self.screenGuiYay.Parent then self.screenGuiYay:Destroy() end
+    if self._destroyed then return end
+    self._destroyed = true
+
+    for _, section in ipairs(self.sectionsAreAwesome) do
+        for _, tab in ipairs(section.tabsInSection or {}) do
+            for _, group in ipairs(tab.groupsInTab or {}) do
+                for _, element in ipairs(group.elementsInGroup or {}) do
+                    if type(element) == "table" and type(element.Close) == "function" then
+                        pcall(function()
+                            element:Close()
+                        end)
+                    end
+                end
+            end
+        end
+    end
+
+    if self.currentTabYay and type(self.currentTabYay.Deactivate) == "function" then
+        pcall(function()
+            self.currentTabYay:Deactivate()
+        end)
+        self.currentTabYay = nil
+    end
+
+    for i = #self._connections, 1, -1 do
+        local conn = self._connections[i]
+        if conn and typeof(conn) == "RBXScriptConnection" then
+            pcall(function()
+                if conn.Connected then
+                    conn:Disconnect()
+                end
+            end)
+        end
+        self._connections[i] = nil
+    end
+
+    self._smoothScrollFrames = {}
+    self._trackedControls = {}
+    self._fpsRollingWindow = {}
+    self._fpsRollingTotal = 0
+    self._latestFPSValue = 0
+
+    if self.screenGuiYay and self.screenGuiYay.Parent then
+        self.screenGuiYay:Destroy()
+    end
 end
 
 return superMegaAwesomeLibrary
