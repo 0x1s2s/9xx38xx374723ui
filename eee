@@ -1430,6 +1430,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     BackgroundColor3 = Color3.fromRGB(28, 28, 28),
                     Position = UDim2.new(1, -keyWidth - 10 - modeTagWidth - modeTagOffset, 0, modeTagY),
                     Size = UDim2.new(0, modeTagWidth, 0, modeTagHeight),
+                    Active = true,
                     Parent = groupObj.mainFrame
                 })
                 makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = keybindObj.modeTagFrame})
@@ -1450,9 +1451,17 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     Parent = keybindObj.modeTagFrame
                 })
                 
+                local modeTagClickButton = makeThingExist("TextButton", {
+                    Text = "",
+                    BackgroundTransparency = 1,
+                    Size = UDim2.new(1, 0, 1, 0),
+                    Active = true,
+                    Parent = keybindObj.modeTagFrame
+                })
+                
                 keybindObj.buttonFrame = makeThingExist("Frame", {
                     BackgroundColor3 = Color3.fromRGB(32, 32, 32), Position = UDim2.new(1, -keyWidth - 10, 0, yPosition),
-                    Size = UDim2.new(0, keyWidth, 0, 21 * mobileScaleFactor), Parent = groupObj.mainFrame
+                    Size = UDim2.new(0, keyWidth, 0, 21 * mobileScaleFactor), Active = true, Parent = groupObj.mainFrame
                 })
                 makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = keybindObj.buttonFrame})
                 
@@ -1477,7 +1486,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     Size = UDim2.new(0, 14 * mobileScaleFactor, 0, 14 * mobileScaleFactor), Parent = keybindObj.buttonFrame
                 })
                 
-                local keybindClickButton = makeThingExist("TextButton", {Text = "", BackgroundTransparency = 1, Size = UDim2.new(1, 0, 1, 0), Parent = keybindObj.buttonFrame})
+                local keybindClickButton = makeThingExist("TextButton", {Text = "", BackgroundTransparency = 1, Size = UDim2.new(1, 0, 1, 0), Active = true, Parent = keybindObj.buttonFrame})
                 local modeMenuWidth = 120 * mobileScaleFactor
                 local modeMenuHeight = 78 * mobileScaleFactor
                 
@@ -1595,7 +1604,35 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     end)
                 end
                 
-                local function updateModeVisuals()
+                local updateModeVisuals
+                local function openModeMenu()
+                    if keybindObj.isListening then return end
+                    keybindObj.isModeMenuOpen = true
+                    updateModeVisuals()
+                    updateModeMenuPositionYay()
+                    keybindObj.modeMenuFrame.Visible = true
+                    smoothMoveGoWoosh(keybindObj.modeMenuFrame, {Size = UDim2.new(0, modeMenuWidth, 0, modeMenuHeight)}, 0.24, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+                    if modePositionConn then modePositionConn:Disconnect() end
+                    modePositionConn = groupObj.Library:_TrackConnection(runServiceMoreLikeWalkService.RenderStepped:Connect(function()
+                        if keybindObj.isModeMenuOpen then
+                            updateModeMenuPositionYay()
+                        elseif modePositionConn then
+                            modePositionConn:Disconnect()
+                            modePositionConn = nil
+                        end
+                    end))
+                end
+                
+                local function toggleModeMenu()
+                    if keybindObj.isListening then return end
+                    if keybindObj.isModeMenuOpen then
+                        closeModeMenu(false)
+                    else
+                        openModeMenu()
+                    end
+                end
+                
+                updateModeVisuals = function()
                     local selectedBg = groupObj.Library.config.AccentColor:Lerp(Color3.fromRGB(16, 16, 16), 0.45)
                     local idleBg = Color3.fromRGB(28, 28, 28)
                     local selectedText = Color3.new(1, 1, 1)
@@ -1683,25 +1720,11 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     smoothMoveGoWoosh(keybindObj.buttonFrame, {BackgroundColor3 = Color3.fromRGB(48, 48, 48)}, 0.2)
                 end)
                 
-                keybindClickButton.MouseButton2Click:Connect(function()
-                    if keybindObj.isListening then return end
-                    keybindObj.isModeMenuOpen = not keybindObj.isModeMenuOpen
-                    if keybindObj.isModeMenuOpen then
-                        updateModeVisuals()
-                        updateModeMenuPositionYay()
-                        keybindObj.modeMenuFrame.Visible = true
-                        smoothMoveGoWoosh(keybindObj.modeMenuFrame, {Size = UDim2.new(0, modeMenuWidth, 0, modeMenuHeight)}, 0.24, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-                        if modePositionConn then modePositionConn:Disconnect() end
-                        modePositionConn = groupObj.Library:_TrackConnection(runServiceMoreLikeWalkService.RenderStepped:Connect(function()
-                            if keybindObj.isModeMenuOpen then
-                                updateModeMenuPositionYay()
-                            elseif modePositionConn then
-                                modePositionConn:Disconnect()
-                                modePositionConn = nil
-                            end
-                        end))
+                modeTagClickButton.MouseButton1Click:Connect(function()
+                    if keybindObj.mode == "Toggle" then
+                        setMode("Hold", false)
                     else
-                        closeModeMenu(false)
+                        setMode("Toggle", false)
                     end
                 end)
                 
@@ -1725,6 +1748,18 @@ function superMegaAwesomeLibrary:CreateSection(config)
                             end
                             keybindObj:Set(pickedKey)
                             smoothMoveGoWoosh(keybindObj.buttonFrame, {BackgroundColor3 = Color3.fromRGB(32, 32, 32)}, 0.2)
+                        end
+                    elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+                        local mousePos = input.Position
+                        local rowStartX = groupObj.mainFrame.AbsolutePosition.X + 10 * mobileScaleFactor
+                        local rowEndX = rowStartX + 240 * mobileScaleFactor
+                        local rowStartY = groupObj.mainFrame.AbsolutePosition.Y + yPosition
+                        local rowEndY = rowStartY + 22 * mobileScaleFactor
+                        local inRow = mousePos.X >= rowStartX and mousePos.X <= rowEndX and mousePos.Y >= rowStartY and mousePos.Y <= rowEndY
+                        if inRow then
+                            toggleModeMenu()
+                        elseif keybindObj.isModeMenuOpen then
+                            closeModeMenu(false)
                         end
                     elseif not gameProcessed and input.UserInputType == Enum.UserInputType.Keyboard then
                         if input.KeyCode == keybindObj.value and keybindObj.value ~= Enum.KeyCode.Unknown then
