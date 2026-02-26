@@ -62,13 +62,15 @@ local function makeDraggableCuzWeCan(frame, handle, libraryRef)
 
     local renderDragConn = runServiceMoreLikeWalkService.RenderStepped:Connect(function(dt)
         if not frame or not frame.Parent then return end
+        if not amIDragging then
+            targetDragPosition = frame.Position
+            return
+        end
         local currentPos = frame.Position
         local goalPos = targetDragPosition
         local offsetDelta = math.abs(goalPos.X.Offset - currentPos.X.Offset) + math.abs(goalPos.Y.Offset - currentPos.Y.Offset)
         if offsetDelta <= 0.1 then
-            if not amIDragging then
-                frame.Position = goalPos
-            end
+            frame.Position = goalPos
             return
         end
         local alpha = math.clamp(1 - math.exp(-dragLerpSpeed * dt), 0, 0.45)
@@ -91,6 +93,9 @@ local function makeDraggableCuzWeCan(frame, handle, libraryRef)
         local inputEndConn
         inputEndConn = input.Changed:Connect(function()
             if input.UserInputState == Enum.UserInputState.End then
+                if frame and frame.Parent then
+                    frame.Position = targetDragPosition
+                end
                 amIDragging = false
                 activeDragInput = nil
                 if inputEndConn then
@@ -1000,7 +1005,8 @@ function superMegaAwesomeLibrary:CreateSection(config)
             
             groupObj.mainFrame = makeThingExist("Frame", {
                 BackgroundColor3 = Color3.fromRGB(18, 18, 18), Position = UDim2.new(0, 1, 0, yPosStart + 1),
-                Size = UDim2.new(0, groupWidth, 0, 50 * mobileScaleFactor), Parent = parentColumn
+                Size = UDim2.new(0, groupWidth, 0, 50 * mobileScaleFactor),
+                ClipsDescendants = true, Parent = parentColumn
             })
             
             local groupStrokeThing = makeThingExist("UIStroke", {Color = Color3.fromRGB(33, 33, 33), Parent = groupObj.mainFrame})
@@ -2047,6 +2053,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
             function groupObj:AddLabel(labelConfig)
                 labelConfig = labelConfig or {}
                 labelConfig.Text = labelConfig.Text or "Label"
+                labelConfig.Wrap = labelConfig.Wrap == true
                 addSearchTerm(labelConfig.Text)
                 local yPosition = groupObj.elementYPos
                 local labelMaxWidth = 238 * mobileScaleFactor
@@ -2055,15 +2062,17 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     tostring(labelConfig.Text),
                     labelTextSize,
                     Enum.Font.GothamSemibold,
-                    Vector2.new(labelMaxWidth, math.huge)
+                    Vector2.new(labelMaxWidth, labelConfig.Wrap and math.huge or (labelTextSize + 4))
                 )
-                local labelHeight = math.max(20 * mobileScaleFactor, measuredBounds.Y)
+                local labelHeight = labelConfig.Wrap and math.max(20 * mobileScaleFactor, measuredBounds.Y) or (20 * mobileScaleFactor)
                 local labelText = makeThingExist("TextLabel", {
                     FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
                     TextColor3 = Color3.fromRGB(124, 124, 124), Text = labelConfig.Text, BackgroundTransparency = 1,
                     Position = UDim2.new(0, 10, 0, yPosition), TextSize = labelTextSize,
                     Size = UDim2.new(0, labelMaxWidth, 0, labelHeight), TextXAlignment = Enum.TextXAlignment.Left,
-                    TextYAlignment = Enum.TextYAlignment.Top, TextWrapped = true,
+                    TextYAlignment = Enum.TextYAlignment.Top, TextWrapped = labelConfig.Wrap,
+                    TextTruncate = labelConfig.Wrap and Enum.TextTruncate.None or Enum.TextTruncate.AtEnd,
+                    ClipsDescendants = true,
                     Parent = groupObj.mainFrame
                 })
                 groupObj.elementYPos = groupObj.elementYPos + labelHeight + 6 * mobileScaleFactor
