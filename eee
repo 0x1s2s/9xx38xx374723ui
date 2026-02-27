@@ -1153,12 +1153,22 @@ function superMegaAwesomeLibrary:_CreateESPPreviewPanel()
 
     local panelWidth = 226 * mobileScaleFactor
     local panelHeight = 296 * mobileScaleFactor
+    local defaultPanelPosition = UDim2.new(0, 14 * mobileScaleFactor, 0, 66 * mobileScaleFactor)
+    if self.mainFrameYay and self.mainFrameYay.Parent then
+        local mainPos = self.mainFrameYay.Position
+        defaultPanelPosition = UDim2.new(
+            mainPos.X.Scale,
+            mainPos.X.Offset - panelWidth - 12 * mobileScaleFactor,
+            mainPos.Y.Scale,
+            mainPos.Y.Offset + 42 * mobileScaleFactor
+        )
+    end
     local panel = makeThingExist("Frame", {
         Name = "FlowESPSelfPreviewPanel",
         BackgroundColor3 = Color3.fromRGB(14, 14, 16),
         BackgroundTransparency = 0.06,
         BorderSizePixel = 0,
-        Position = UDim2.new(0, 14 * mobileScaleFactor, 0, 66 * mobileScaleFactor),
+        Position = defaultPanelPosition,
         Size = UDim2.new(0, panelWidth, 0, panelHeight),
         Visible = false,
         ZIndex = 30,
