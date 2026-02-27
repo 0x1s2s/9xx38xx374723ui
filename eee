@@ -708,7 +708,6 @@ end
 
 local flowPreviewCoreBodyParts = {
     Head = true,
-    HumanoidRootPart = true,
     UpperTorso = true,
     LowerTorso = true,
     Torso = true,
@@ -946,9 +945,12 @@ function superMegaAwesomeLibrary:_EnsureESPPreviewCharacter()
             if obj:IsA("Script") or obj:IsA("LocalScript") then
                 obj:Destroy()
             elseif obj:IsA("BasePart") then
+                local isRootPart = obj.Name == "HumanoidRootPart"
                 local isCoreBodyPart = flowPreviewCoreBodyParts[obj.Name] == true
                 local sanitizedTransparency = math.clamp(tonumber(obj.Transparency) or 0, 0, 1)
-                if isCoreBodyPart and sanitizedTransparency >= 0.98 then
+                if isRootPart then
+                    sanitizedTransparency = 1
+                elseif isCoreBodyPart and sanitizedTransparency >= 0.98 then
                     sanitizedTransparency = 0
                 end
                 self._espPreviewPartDefaults[obj] = {
@@ -960,6 +962,11 @@ function superMegaAwesomeLibrary:_EnsureESPPreviewCharacter()
                 pcall(function()
                     obj.LocalTransparencyModifier = 0
                 end)
+                if isRootPart then
+                    pcall(function()
+                        obj.LocalTransparencyModifier = 1
+                    end)
+                end
                 obj.CanCollide = false
                 pcall(function()
                     obj.CanQuery = false
@@ -1846,9 +1853,15 @@ function superMegaAwesomeLibrary:_UpdateESPPreview(dt)
 
     for part, originalData in pairs(self._espPreviewPartDefaults) do
         if part and part.Parent and originalData then
-            pcall(function()
-                part.LocalTransparencyModifier = 0
-            end)
+            if part.Name == "HumanoidRootPart" then
+                pcall(function()
+                    part.LocalTransparencyModifier = 1
+                end)
+            else
+                pcall(function()
+                    part.LocalTransparencyModifier = 0
+                end)
+            end
             if state.ShowChams == true and state.Enabled ~= false and part.Name ~= "HumanoidRootPart" then
                 part.Material = Enum.Material.ForceField
                 part.Color = previewColor
@@ -1856,7 +1869,9 @@ function superMegaAwesomeLibrary:_UpdateESPPreview(dt)
             else
                 part.Material = originalData.Material
                 part.Color = originalData.Color
-                if flowPreviewCoreBodyParts[part.Name] and (originalData.Transparency or 0) >= 0.98 then
+                if part.Name == "HumanoidRootPart" then
+                    part.Transparency = 1
+                elseif flowPreviewCoreBodyParts[part.Name] and (originalData.Transparency or 0) >= 0.98 then
                     part.Transparency = 0
                 else
                     part.Transparency = originalData.Transparency
