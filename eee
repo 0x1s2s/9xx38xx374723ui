@@ -2536,7 +2536,7 @@ function superMegaAwesomeLibrary:CreateWatermarkBecauseWeCool()
     self.watermarkFrame = makeThingExist("Frame", {
         Name = "WatermarkCuzWeNeedFlexing",
         BackgroundColor3 = Color3.fromRGB(16, 16, 16),
-        Position = UDim2.new(0.01, 0, 0.02, 0),
+        Position = UDim2.new(0, 4 * mobileScaleFactor, 0.215, 0),
         BorderSizePixel = 0,
         Size = UDim2.new(0, initialWidth * mobileScaleFactor, 0, 36 * mobileScaleFactor),
         Parent = self.screenGuiYay
