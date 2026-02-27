@@ -2159,7 +2159,12 @@ function superMegaAwesomeLibrary:SaveConfig(fileName)
     
     local folder = "FlowUIConfigs"
     if not isfolder(folder) then
-        makefolder(folder)
+        local okMake, errMake = pcall(function()
+            makefolder(folder)
+        end)
+        if not okMake then
+            return false, "Failed to create config folder: " .. tostring(errMake)
+        end
     end
     
     local configName = sanitizeConfigName(fileName)
@@ -2177,7 +2182,12 @@ function superMegaAwesomeLibrary:SaveConfig(fileName)
     end
     
     local encoded = httpServiceNoCap:JSONEncode(payload)
-    writefile(folder .. "/" .. configName .. ".json", encoded)
+    local okWrite, errWrite = pcall(function()
+        writefile(folder .. "/" .. configName .. ".json", encoded)
+    end)
+    if not okWrite then
+        return false, "Failed to write config file: " .. tostring(errWrite)
+    end
     return true
 end
 
