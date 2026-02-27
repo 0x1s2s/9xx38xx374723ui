@@ -4377,9 +4377,19 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
                     TextColor3 = Color3.new(1, 1, 1), Text = dropdownConfig.Name, BackgroundTransparency = 1,
                     Position = UDim2.new(0, 12, 0, 8 * mobileScaleFactor), TextSize = 14 * mobileScaleFactor,
-                    Size = UDim2.new(1, -24, 0, 20 * mobileScaleFactor), TextXAlignment = Enum.TextXAlignment.Left,
+                    Size = UDim2.new(1, -44 * mobileScaleFactor, 0, 20 * mobileScaleFactor), TextXAlignment = Enum.TextXAlignment.Left,
                     TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 10000, Parent = dropdownObj.optionHolderFrame
                 })
+
+                local dropdownCloseButton = makeThingExist("TextButton", {
+                    FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold),
+                    Text = "✕", TextColor3 = Color3.fromRGB(138, 138, 138), TextSize = 12 * mobileScaleFactor,
+                    BackgroundColor3 = Color3.fromRGB(24, 24, 24), AutoButtonColor = false,
+                    Position = UDim2.new(1, -24 * mobileScaleFactor, 0, 6 * mobileScaleFactor),
+                    Size = UDim2.new(0, 16 * mobileScaleFactor, 0, 16 * mobileScaleFactor),
+                    ZIndex = 10002, Parent = dropdownObj.optionHolderFrame
+                })
+                makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = dropdownCloseButton})
                 
                 dropdownObj.optionScrollFrame = makeThingExist("ScrollingFrame", {
                     BackgroundTransparency = 1, Position = UDim2.new(0, 0, 0, 30 * mobileScaleFactor),
@@ -4421,6 +4431,16 @@ function superMegaAwesomeLibrary:CreateSection(config)
                         end
                     end)
                 end
+
+                dropdownCloseButton.MouseButton1Click:Connect(function()
+                    closeDropdown(false)
+                end)
+                dropdownCloseButton.MouseEnter:Connect(function()
+                    smoothMoveGoWoosh(dropdownCloseButton, {BackgroundColor3 = Color3.fromRGB(44, 44, 44), TextColor3 = Color3.fromRGB(220, 220, 220)}, 0.12)
+                end)
+                dropdownCloseButton.MouseLeave:Connect(function()
+                    smoothMoveGoWoosh(dropdownCloseButton, {BackgroundColor3 = Color3.fromRGB(24, 24, 24), TextColor3 = Color3.fromRGB(138, 138, 138)}, 0.12)
+                end)
                 
                 local function createOptionsYay()
                     for _, child in pairs(dropdownObj.optionContainerFrame:GetChildren()) do
@@ -4633,9 +4653,19 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
                     TextColor3 = Color3.new(1, 1, 1), Text = multiDropdownConfig.Name, BackgroundTransparency = 1,
                     Position = UDim2.new(0, 12, 0, 8 * mobileScaleFactor), TextSize = 14 * mobileScaleFactor,
-                    Size = UDim2.new(1, -24, 0, 20 * mobileScaleFactor), TextXAlignment = Enum.TextXAlignment.Left,
+                    Size = UDim2.new(1, -44 * mobileScaleFactor, 0, 20 * mobileScaleFactor), TextXAlignment = Enum.TextXAlignment.Left,
                     TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 10000, Parent = multiDropdownObj.optionHolderFrame
                 })
+
+                local multiDropdownCloseButton = makeThingExist("TextButton", {
+                    FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold),
+                    Text = "✕", TextColor3 = Color3.fromRGB(138, 138, 138), TextSize = 12 * mobileScaleFactor,
+                    BackgroundColor3 = Color3.fromRGB(24, 24, 24), AutoButtonColor = false,
+                    Position = UDim2.new(1, -24 * mobileScaleFactor, 0, 6 * mobileScaleFactor),
+                    Size = UDim2.new(0, 16 * mobileScaleFactor, 0, 16 * mobileScaleFactor),
+                    ZIndex = 10002, Parent = multiDropdownObj.optionHolderFrame
+                })
+                makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = multiDropdownCloseButton})
                 
                 multiDropdownObj.optionScrollFrame = makeThingExist("ScrollingFrame", {
                     BackgroundTransparency = 1, Position = UDim2.new(0, 0, 0, 30 * mobileScaleFactor),
@@ -4677,6 +4707,16 @@ function superMegaAwesomeLibrary:CreateSection(config)
                         end
                     end)
                 end
+
+                multiDropdownCloseButton.MouseButton1Click:Connect(function()
+                    closeMultiDropdown(false)
+                end)
+                multiDropdownCloseButton.MouseEnter:Connect(function()
+                    smoothMoveGoWoosh(multiDropdownCloseButton, {BackgroundColor3 = Color3.fromRGB(44, 44, 44), TextColor3 = Color3.fromRGB(220, 220, 220)}, 0.12)
+                end)
+                multiDropdownCloseButton.MouseLeave:Connect(function()
+                    smoothMoveGoWoosh(multiDropdownCloseButton, {BackgroundColor3 = Color3.fromRGB(24, 24, 24), TextColor3 = Color3.fromRGB(138, 138, 138)}, 0.12)
+                end)
 
                 local function createMultiOptionsYay()
                     for _, child in pairs(multiDropdownObj.optionContainerFrame:GetChildren()) do
