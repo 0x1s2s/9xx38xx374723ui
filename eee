@@ -847,6 +847,33 @@ function superMegaAwesomeLibrary:_StartESPPreviewWalkAnimation(sourceCharacter)
     end
 end
 
+function superMegaAwesomeLibrary:_CreateESPPreviewFallbackCharacter()
+    local fallbackModel = nil
+    local created = false
+    local okCreate = pcall(function()
+        fallbackModel = playersAreNoobs:CreateHumanoidModelFromUserId(theOneAndOnlyPlayer.UserId)
+    end)
+    if not okCreate or not fallbackModel then
+        local okDescription, humanoidDescription = pcall(function()
+            return playersAreNoobs:GetHumanoidDescriptionFromUserId(theOneAndOnlyPlayer.UserId)
+        end)
+        if okDescription and humanoidDescription then
+            pcall(function()
+                fallbackModel = playersAreNoobs:CreateHumanoidModelFromDescription(humanoidDescription, Enum.HumanoidRigType.R15)
+                created = true
+            end)
+        end
+    end
+    if fallbackModel then
+        fallbackModel.Name = "FlowESPSelfPreviewAvatar"
+        if created and not fallbackModel:FindFirstChildOfClass("Humanoid") then
+            fallbackModel:Destroy()
+            return nil
+        end
+    end
+    return fallbackModel
+end
+
 function superMegaAwesomeLibrary:_DestroyESPPreviewCharacter()
     if self._espPreviewWalkTrack then
         pcall(function()
@@ -875,99 +902,163 @@ function superMegaAwesomeLibrary:_EnsureESPPreviewCharacter()
         return
     end
     local liveCharacter = theOneAndOnlyPlayer.Character
-    if liveCharacter and self._espPreviewCharacter and self._espPreviewCharacter.Parent and self._espPreviewLastCharacter == liveCharacter then
-        return
+    if self._espPreviewCharacter and self._espPreviewCharacter.Parent then
+        if liveCharacter and self._espPreviewLastCharacter == liveCharacter then
+            return
+        end
+        if not liveCharacter and self._espPreviewLastCharacter == false then
+            return
+        end
     end
     self:_DestroyESPPreviewCharacter()
-    if not liveCharacter then
-        return
+
+    local function cloneFromLiveCharacter()
+        if not liveCharacter then
+            return nil
+        end
+        local previousArchivable = liveCharacter.Archivable
+        local cloneCharacter = nil
+        local clonedOk = pcall(function()
+            liveCharacter.Archivable = true
+            cloneCharacter = liveCharacter:Clone()
+        end)
+        pcall(function()
+            liveCharacter.Archivable = previousArchivable
+        end)
+        if not clonedOk then
+            return nil
+        end
+        return cloneCharacter
     end
 
-    local previousArchivable = liveCharacter.Archivable
-    local cloneCharacter = nil
-    local clonedOk = pcall(function()
-        liveCharacter.Archivable = true
-        cloneCharacter = liveCharacter:Clone()
-    end)
-    pcall(function()
-        liveCharacter.Archivable = previousArchivable
-    end)
-    if not clonedOk or not cloneCharacter then
-        return
-    end
+    local function preparePreviewCharacter(model)
+        if not model then
+            return false
+        end
+        self._espPreviewPartDefaults = {}
+        local rootPart = model:FindFirstChild("HumanoidRootPart")
+            or model:FindFirstChild("UpperTorso")
+            or model:FindFirstChild("Torso")
+        local corePartCount = 0
+        local visibleCorePartCount = 0
+        local visiblePartCount = 0
+        for _, obj in ipairs(model:GetDescendants()) do
+            if obj:IsA("Script") or obj:IsA("LocalScript") then
+                obj:Destroy()
+            elseif obj:IsA("BasePart") then
+                local isCoreBodyPart = flowPreviewCoreBodyParts[obj.Name] == true
+                local sanitizedTransparency = math.clamp(tonumber(obj.Transparency) or 0, 0, 1)
+                if isCoreBodyPart and sanitizedTransparency >= 0.98 then
+                    sanitizedTransparency = 0
+                end
+                self._espPreviewPartDefaults[obj] = {
+                    Color = obj.Color,
+                    Material = obj.Material,
+                    Transparency = sanitizedTransparency
+                }
+                obj.Transparency = sanitizedTransparency
+                pcall(function()
+                    obj.LocalTransparencyModifier = 0
+                end)
+                obj.CanCollide = false
+                pcall(function()
+                    obj.CanQuery = false
+                end)
+                pcall(function()
+                    obj.CanTouch = false
+                end)
+                obj.Massless = true
+                obj.CastShadow = false
+                if rootPart == nil then
+                    rootPart = obj
+                end
+                obj.Anchored = obj == rootPart
 
-    local corePartCount = 0
-    local visibleCorePartCount = 0
-    for _, obj in ipairs(cloneCharacter:GetDescendants()) do
-        if obj:IsA("Script") or obj:IsA("LocalScript") then
-            obj:Destroy()
-        elseif obj:IsA("BasePart") then
-            local isCoreBodyPart = flowPreviewCoreBodyParts[obj.Name] == true
-            local sanitizedTransparency = math.clamp(obj.Transparency, 0, 1)
-            if isCoreBodyPart and sanitizedTransparency >= 0.98 then
-                sanitizedTransparency = 0
-            end
-            self._espPreviewPartDefaults[obj] = {
-                Color = obj.Color,
-                Material = obj.Material,
-                Transparency = sanitizedTransparency
-            }
-            obj.Transparency = sanitizedTransparency
-            pcall(function()
-                obj.LocalTransparencyModifier = 0
-            end)
-            obj.CanCollide = false
-            obj.Massless = true
-            obj.CastShadow = not isCoreBodyPart
-            if obj.Name == "HumanoidRootPart" then
-                obj.Anchored = true
-            else
-                obj.Anchored = false
-            end
-            if isCoreBodyPart then
-                corePartCount = corePartCount + 1
-                if sanitizedTransparency < 0.98 then
-                    visibleCorePartCount = visibleCorePartCount + 1
+                if sanitizedTransparency < 0.985 and obj.Size.Magnitude > 0.05 then
+                    visiblePartCount = visiblePartCount + 1
+                end
+                if isCoreBodyPart then
+                    corePartCount = corePartCount + 1
+                    if sanitizedTransparency < 0.985 then
+                        visibleCorePartCount = visibleCorePartCount + 1
+                    end
                 end
             end
         end
-    end
 
-    if corePartCount > 0 and visibleCorePartCount < math.min(4, corePartCount) then
-        for part, originalData in pairs(self._espPreviewPartDefaults) do
-            if part and part.Parent and originalData and flowPreviewCoreBodyParts[part.Name] then
-                originalData.Transparency = 0
-                part.Transparency = 0
+        if corePartCount > 0 and visibleCorePartCount < math.min(4, corePartCount) then
+            for part, originalData in pairs(self._espPreviewPartDefaults) do
+                if part and part.Parent and originalData and flowPreviewCoreBodyParts[part.Name] then
+                    originalData.Transparency = 0
+                    part.Transparency = 0
+                end
             end
+            visibleCorePartCount = math.max(visibleCorePartCount, math.min(4, corePartCount))
         end
+
+        if visiblePartCount < 6 then
+            for _, obj in ipairs(model:GetDescendants()) do
+                if obj:IsA("BasePart") and obj.Transparency >= 0.98 and obj.Name ~= "HumanoidRootPart" then
+                    obj.Transparency = 0
+                end
+            end
+            visiblePartCount = 6
+        end
+
+        if corePartCount > 0 and corePartCount < 3 then
+            return false
+        end
+        if corePartCount >= 3 and visibleCorePartCount < 3 then
+            return false
+        end
+        return visiblePartCount >= 6
     end
 
-    cloneCharacter.Parent = self._espPreviewWorldModel
-    local previewHumanoid = cloneCharacter:FindFirstChildOfClass("Humanoid")
+    local previewCharacter = cloneFromLiveCharacter()
+    local hasReliableClone = preparePreviewCharacter(previewCharacter)
+    if not hasReliableClone and previewCharacter and previewCharacter.Parent == nil then
+        previewCharacter:Destroy()
+        previewCharacter = nil
+    end
+
+    if not previewCharacter then
+        previewCharacter = self:_CreateESPPreviewFallbackCharacter()
+        preparePreviewCharacter(previewCharacter)
+    end
+    if not previewCharacter then
+        return
+    end
+
+    previewCharacter.Parent = self._espPreviewWorldModel
+    local previewHumanoid = previewCharacter:FindFirstChildOfClass("Humanoid")
     if previewHumanoid then
         previewHumanoid.AutoRotate = false
         previewHumanoid.PlatformStand = false
+        pcall(function()
+            previewHumanoid.BreakJointsOnDeath = false
+        end)
     end
-    pcall(function()
-        cloneCharacter:PivotTo(CFrame.new(0, -1.35, 0) * CFrame.Angles(0, math.rad(180), 0))
+    local previewExtents = Vector3.new(4, 6, 3)
+    local okPreviewExtents, calculatedPreviewExtents = pcall(function()
+        return previewCharacter:GetExtentsSize()
     end)
-    self._espPreviewCharacter = cloneCharacter
-    self._espPreviewLastCharacter = liveCharacter
+    if okPreviewExtents and calculatedPreviewExtents then
+        previewExtents = calculatedPreviewExtents
+    end
+    local pivotYOffset = -math.clamp(previewExtents.Y * 0.43, 1.2, 3.2)
+    pcall(function()
+        previewCharacter:PivotTo(CFrame.new(0, pivotYOffset, 0) * CFrame.Angles(0, math.rad(180), 0))
+    end)
+    self._espPreviewCharacter = previewCharacter
+    self._espPreviewLastCharacter = liveCharacter or false
     if self._espPreviewHighlight then
-        self._espPreviewHighlight.Adornee = cloneCharacter
+        self._espPreviewHighlight.Adornee = previewCharacter
     end
 
     if self._espPreviewCamera then
-        local focus = Vector3.new(0, 1.25, 0)
-        local depth = 5.3
-        local okExtents, extents = pcall(function()
-            return cloneCharacter:GetExtentsSize()
-        end)
-        if okExtents and extents then
-            depth = math.max(5.0, math.max(extents.X, extents.Z) * 1.6 + extents.Y * 0.2)
-            focus = Vector3.new(0, math.clamp(extents.Y * 0.3, 1.18, 2.25), 0)
-        end
-        self._espPreviewCamera.FieldOfView = 34
+        local focus = Vector3.new(0, math.clamp(previewExtents.Y * 0.36, 1.2, 2.45), 0)
+        local depth = math.clamp(math.max(6.8, previewExtents.Y * 1.05 + previewExtents.X * 0.65), 6.8, 18)
+        self._espPreviewCamera.FieldOfView = 32
         self._espPreviewCamera.CFrame = CFrame.new(Vector3.new(0, focus.Y, depth), focus)
     end
     self:_StartESPPreviewWalkAnimation(liveCharacter)
@@ -1520,9 +1611,95 @@ function superMegaAwesomeLibrary:_UpdateESPPreview(dt)
     local headScreenPos = nil
     local rootScreenPos = nil
 
-    if viewportCamera and viewportSize.X > 2 and viewportSize.Y > 2 then
+    local function gatherProjectParts()
+        local coreParts = {}
+        local bodyParts = {}
         for _, part in ipairs(self._espPreviewCharacter:GetDescendants()) do
-            if part:IsA("BasePart") and part.Transparency < 0.98 and part.Size.Magnitude > 0 then
+            if part:IsA("BasePart") and part.Transparency < 0.985 and part.Size.Magnitude > 0.05 then
+                local parentObj = part.Parent
+                local isAccessoryPart = parentObj and parentObj:IsA("Accessory")
+                if flowPreviewCoreBodyParts[part.Name] == true then
+                    table.insert(coreParts, part)
+                elseif not isAccessoryPart then
+                    table.insert(bodyParts, part)
+                end
+            end
+        end
+        if #coreParts >= 4 then
+            return coreParts
+        end
+        if #bodyParts > 0 then
+            return bodyParts
+        end
+        local fallbackParts = {}
+        for _, part in ipairs(self._espPreviewCharacter:GetDescendants()) do
+            if part:IsA("BasePart") and part.Transparency < 0.99 and part.Size.Magnitude > 0.05 then
+                table.insert(fallbackParts, part)
+            end
+        end
+        return fallbackParts
+    end
+
+    local projectParts = gatherProjectParts()
+
+    local function getWorldBounds(parts)
+        local minVec = Vector3.new(math.huge, math.huge, math.huge)
+        local maxVec = Vector3.new(-math.huge, -math.huge, -math.huge)
+        local partCount = 0
+        for _, part in ipairs(parts) do
+            if part and part.Parent then
+                partCount = partCount + 1
+                local halfSize = part.Size * 0.5
+                local partCF = part.CFrame
+                for xSign = -1, 1, 2 do
+                    for ySign = -1, 1, 2 do
+                        for zSign = -1, 1, 2 do
+                            local worldPoint = partCF:PointToWorldSpace(Vector3.new(halfSize.X * xSign, halfSize.Y * ySign, halfSize.Z * zSign))
+                            minVec = Vector3.new(
+                                math.min(minVec.X, worldPoint.X),
+                                math.min(minVec.Y, worldPoint.Y),
+                                math.min(minVec.Z, worldPoint.Z)
+                            )
+                            maxVec = Vector3.new(
+                                math.max(maxVec.X, worldPoint.X),
+                                math.max(maxVec.Y, worldPoint.Y),
+                                math.max(maxVec.Z, worldPoint.Z)
+                            )
+                        end
+                    end
+                end
+            end
+        end
+        if partCount <= 0 then
+            return nil, nil
+        end
+        return minVec, maxVec
+    end
+
+    if viewportCamera and viewportSize.X > 2 and viewportSize.Y > 2 and #projectParts > 0 then
+        viewportCamera.FieldOfView = 32
+        local boundsMin, boundsMax = getWorldBounds(projectParts)
+        if boundsMin and boundsMax then
+            local boundsSize = boundsMax - boundsMin
+            local boundsCenter = boundsMin + boundsSize * 0.5
+            local verticalFov = math.rad(math.clamp(viewportCamera.FieldOfView, 18, 80))
+            local aspectRatio = math.max(0.35, viewportSize.X / viewportSize.Y)
+            local horizontalHalfFov = math.atan(math.tan(verticalFov * 0.5) * aspectRatio)
+            local fitDepthY = (boundsSize.Y * 0.5) / math.tan(verticalFov * 0.5)
+            local fitDepthX = (boundsSize.X * 0.5) / math.tan(horizontalHalfFov)
+            local targetDepth = math.max(fitDepthX, fitDepthY) + boundsSize.Z * 0.85 + 1.35
+            targetDepth = math.clamp(targetDepth, 6.8, 19.5)
+            local lookTarget = boundsCenter + Vector3.new(0, math.clamp(boundsSize.Y * 0.03, -0.1, 0.45), 0)
+            local cameraPos = lookTarget + Vector3.new(0, math.clamp(boundsSize.Y * 0.08, -0.2, 0.6), targetDepth)
+            local targetCFrame = CFrame.new(cameraPos, lookTarget)
+            local lerpAlpha = math.clamp((dt or (1 / 60)) * 10, 0.12, 0.52)
+            viewportCamera.CFrame = viewportCamera.CFrame:Lerp(targetCFrame, lerpAlpha)
+        end
+    end
+
+    if viewportCamera and viewportSize.X > 2 and viewportSize.Y > 2 then
+        for _, part in ipairs(projectParts) do
+            if part and part.Parent and part.Transparency < 0.985 then
                 local halfSize = part.Size * 0.5
                 local partCF = part.CFrame
                 for xSign = -1, 1, 2 do
@@ -1547,7 +1724,7 @@ function superMegaAwesomeLibrary:_UpdateESPPreview(dt)
             or self._espPreviewCharacter:FindFirstChild("UpperTorso")
             or self._espPreviewCharacter:FindFirstChild("HumanoidRootPart")
         if headPart then
-            local headWorld = headPart.Position + Vector3.new(0, math.max(0.1, headPart.Size.Y * 0.3), 0)
+            local headWorld = headPart.Position + Vector3.new(0, math.max(0.12, headPart.Size.Y * 0.3), 0)
             local headPoint = viewportCamera:WorldToViewportPoint(headWorld)
             if headPoint.Z > 0 then
                 headScreenPos = Vector2.new(headPoint.X, headPoint.Y)
@@ -1569,6 +1746,22 @@ function superMegaAwesomeLibrary:_UpdateESPPreview(dt)
         boxMaxY = math.clamp(boxMaxY, 0, viewportSize.Y)
         if boxMaxX - boxMinX < 2 or boxMaxY - boxMinY < 2 then
             hasProjectedBox = false
+        end
+    end
+
+    if not hasProjectedBox and viewportSize.X > 2 and viewportSize.Y > 2 then
+        local fallbackWidth = viewportSize.X * 0.44
+        local fallbackHeight = viewportSize.Y * 0.78
+        boxMinX = (viewportSize.X - fallbackWidth) * 0.5
+        boxMaxX = boxMinX + fallbackWidth
+        boxMinY = viewportSize.Y * 0.1
+        boxMaxY = boxMinY + fallbackHeight
+        hasProjectedBox = true
+        if not headScreenPos then
+            headScreenPos = Vector2.new((boxMinX + boxMaxX) * 0.5, boxMinY + 8 * mobileScaleFactor)
+        end
+        if not rootScreenPos then
+            rootScreenPos = Vector2.new((boxMinX + boxMaxX) * 0.5, boxMaxY)
         end
     end
 
@@ -1653,6 +1846,9 @@ function superMegaAwesomeLibrary:_UpdateESPPreview(dt)
 
     for part, originalData in pairs(self._espPreviewPartDefaults) do
         if part and part.Parent and originalData then
+            pcall(function()
+                part.LocalTransparencyModifier = 0
+            end)
             if state.ShowChams == true and state.Enabled ~= false and part.Name ~= "HumanoidRootPart" then
                 part.Material = Enum.Material.ForceField
                 part.Color = previewColor
@@ -1660,7 +1856,11 @@ function superMegaAwesomeLibrary:_UpdateESPPreview(dt)
             else
                 part.Material = originalData.Material
                 part.Color = originalData.Color
-                part.Transparency = originalData.Transparency
+                if flowPreviewCoreBodyParts[part.Name] and (originalData.Transparency or 0) >= 0.98 then
+                    part.Transparency = 0
+                else
+                    part.Transparency = originalData.Transparency
+                end
             end
         end
     end
