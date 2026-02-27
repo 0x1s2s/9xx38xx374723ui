@@ -260,6 +260,7 @@ function superMegaAwesomeLibrary.new(config)
     self._overlayMode = "Snow"
     self._overlayModes = {"Snow", "Rain", "Stars", "None"}
     self._backgroundFxTime = 0
+    self._textGradientAnimationTime = 0
     self._uiVisualSettings = {
         Blur = true,
         Snow = true,
@@ -578,6 +579,8 @@ end
 function superMegaAwesomeLibrary:_SetTextGradientEnabled(enabled)
     self._uiVisualSettings.TextGradient = enabled == true
     local accent = self.config.AccentColor
+    local animationTime = tonumber(self._textGradientAnimationTime) or 0
+    local sweepX = ((animationTime * 0.55) % 2) - 1
     for _, label in ipairs(self._gradientLabels) do
         if label and label.Parent then
             local gradientObj = label:FindFirstChild("FlowUITextGradient")
@@ -594,8 +597,29 @@ function superMegaAwesomeLibrary:_SetTextGradientEnabled(enabled)
                     ColorSequenceKeypoint.new(0.55, Color3.new(1, 1, 1)),
                     ColorSequenceKeypoint.new(1, accent:Lerp(Color3.new(1, 1, 1), 0.35))
                 })
+                gradientObj.Offset = Vector2.new(sweepX, 0)
             elseif gradientObj then
                 gradientObj:Destroy()
+            end
+        end
+    end
+end
+
+function superMegaAwesomeLibrary:_AnimateTextGradients(dt)
+    if not self._uiVisualSettings.TextGradient then
+        return
+    end
+
+    self._textGradientAnimationTime = (tonumber(self._textGradientAnimationTime) or 0) + (dt or 0)
+    local sweepX = ((self._textGradientAnimationTime * 0.55) % 2) - 1
+    local driftY = math.sin(self._textGradientAnimationTime * 1.8) * 0.04
+    local animatedOffset = Vector2.new(sweepX, driftY)
+
+    for _, label in ipairs(self._gradientLabels) do
+        if label and label.Parent then
+            local gradientObj = label:FindFirstChild("FlowUITextGradient")
+            if gradientObj then
+                gradientObj.Offset = animatedOffset
             end
         end
     end
@@ -2268,6 +2292,7 @@ function superMegaAwesomeLibrary:CreateUIBecauseWeNeedIt()
         end
 
         self:_UpdateESPPreview(dt)
+        self:_AnimateTextGradients(dt)
 
         if self._uiVisualSettings.BackgroundEffects and self.mainBackgroundEffectsFrame and self.mainBackgroundEffectsFrame.Visible then
             self._backgroundFxTime = self._backgroundFxTime + dt
@@ -5568,6 +5593,7 @@ function superMegaAwesomeLibrary:Destroy()
     self._espPreviewIsRotating = false
     self._espPreviewRotateInput = nil
     self._espPreviewRotateLastX = nil
+    self._textGradientAnimationTime = nil
 
     if self._blurEffectRef and self._blurEffectRef.Parent then
         self._blurEffectRef:Destroy()
