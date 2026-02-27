@@ -4383,10 +4383,10 @@ function superMegaAwesomeLibrary:CreateSection(config)
 
                 local dropdownCloseButton = makeThingExist("TextButton", {
                     FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold),
-                    Text = "✕", TextColor3 = Color3.fromRGB(138, 138, 138), TextSize = 12 * mobileScaleFactor,
+                    Text = "X", TextColor3 = Color3.fromRGB(170, 170, 170), TextSize = 14 * mobileScaleFactor,
                     BackgroundColor3 = Color3.fromRGB(24, 24, 24), AutoButtonColor = false,
-                    Position = UDim2.new(1, -24 * mobileScaleFactor, 0, 6 * mobileScaleFactor),
-                    Size = UDim2.new(0, 16 * mobileScaleFactor, 0, 16 * mobileScaleFactor),
+                    Position = UDim2.new(1, -25 * mobileScaleFactor, 0, 5 * mobileScaleFactor),
+                    Size = UDim2.new(0, 18 * mobileScaleFactor, 0, 18 * mobileScaleFactor),
                     ZIndex = 10002, Parent = dropdownObj.optionHolderFrame
                 })
                 makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = dropdownCloseButton})
@@ -4659,10 +4659,10 @@ function superMegaAwesomeLibrary:CreateSection(config)
 
                 local multiDropdownCloseButton = makeThingExist("TextButton", {
                     FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold),
-                    Text = "✕", TextColor3 = Color3.fromRGB(138, 138, 138), TextSize = 12 * mobileScaleFactor,
+                    Text = "X", TextColor3 = Color3.fromRGB(170, 170, 170), TextSize = 14 * mobileScaleFactor,
                     BackgroundColor3 = Color3.fromRGB(24, 24, 24), AutoButtonColor = false,
-                    Position = UDim2.new(1, -24 * mobileScaleFactor, 0, 6 * mobileScaleFactor),
-                    Size = UDim2.new(0, 16 * mobileScaleFactor, 0, 16 * mobileScaleFactor),
+                    Position = UDim2.new(1, -25 * mobileScaleFactor, 0, 5 * mobileScaleFactor),
+                    Size = UDim2.new(0, 18 * mobileScaleFactor, 0, 18 * mobileScaleFactor),
                     ZIndex = 10002, Parent = multiDropdownObj.optionHolderFrame
                 })
                 makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = multiDropdownCloseButton})
