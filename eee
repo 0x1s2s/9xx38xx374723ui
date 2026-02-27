@@ -579,8 +579,9 @@ end
 function superMegaAwesomeLibrary:_SetTextGradientEnabled(enabled)
     self._uiVisualSettings.TextGradient = enabled == true
     local accent = self.config.AccentColor
+    local gradientSweepSpeed = 0.9
     local animationTime = tonumber(self._textGradientAnimationTime) or 0
-    local sweepX = ((animationTime * 0.55) % 2) - 1
+    local sweepX = ((animationTime * gradientSweepSpeed) % 2) - 1
     for _, label in ipairs(self._gradientLabels) do
         if label and label.Parent then
             local gradientObj = label:FindFirstChild("FlowUITextGradient")
@@ -588,10 +589,11 @@ function superMegaAwesomeLibrary:_SetTextGradientEnabled(enabled)
                 if not gradientObj then
                     gradientObj = makeThingExist("UIGradient", {
                         Name = "FlowUITextGradient",
-                        Rotation = 16,
+                        Rotation = 0,
                         Parent = label
                     })
                 end
+                gradientObj.Rotation = 0
                 gradientObj.Color = ColorSequence.new({
                     ColorSequenceKeypoint.new(0, accent:Lerp(Color3.new(1, 1, 1), 0.2)),
                     ColorSequenceKeypoint.new(0.55, Color3.new(1, 1, 1)),
@@ -610,15 +612,16 @@ function superMegaAwesomeLibrary:_AnimateTextGradients(dt)
         return
     end
 
+    local gradientSweepSpeed = 0.9
     self._textGradientAnimationTime = (tonumber(self._textGradientAnimationTime) or 0) + (dt or 0)
-    local sweepX = ((self._textGradientAnimationTime * 0.55) % 2) - 1
-    local driftY = math.sin(self._textGradientAnimationTime * 1.8) * 0.04
-    local animatedOffset = Vector2.new(sweepX, driftY)
+    local sweepX = ((self._textGradientAnimationTime * gradientSweepSpeed) % 2) - 1
+    local animatedOffset = Vector2.new(sweepX, 0)
 
     for _, label in ipairs(self._gradientLabels) do
         if label and label.Parent then
             local gradientObj = label:FindFirstChild("FlowUITextGradient")
             if gradientObj then
+                gradientObj.Rotation = 0
                 gradientObj.Offset = animatedOffset
             end
         end
