@@ -280,6 +280,8 @@ function superMegaAwesomeLibrary.new(config)
     self._espPreviewName = nil
     self._espPreviewItem = nil
     self._espPreviewDistance = nil
+    self._espPreviewWalkTrack = nil
+    self._espPreviewAnimationId = nil
     
     self:CreateUIBecauseWeNeedIt()
     
@@ -704,6 +706,30 @@ local function flowPreviewToColor3(value)
     return Color3.new(math.clamp(r, 0, 1), math.clamp(g, 0, 1), math.clamp(b, 0, 1))
 end
 
+local flowPreviewCoreBodyParts = {
+    Head = true,
+    HumanoidRootPart = true,
+    UpperTorso = true,
+    LowerTorso = true,
+    Torso = true,
+    LeftUpperArm = true,
+    LeftLowerArm = true,
+    LeftHand = true,
+    RightUpperArm = true,
+    RightLowerArm = true,
+    RightHand = true,
+    LeftUpperLeg = true,
+    LeftLowerLeg = true,
+    LeftFoot = true,
+    RightUpperLeg = true,
+    RightLowerLeg = true,
+    RightFoot = true,
+    ["Left Arm"] = true,
+    ["Right Arm"] = true,
+    ["Left Leg"] = true,
+    ["Right Leg"] = true
+}
+
 function superMegaAwesomeLibrary:SetESPPreviewProvider(providerFn)
     if providerFn ~= nil and type(providerFn) ~= "function" then
         return false, "ESP preview provider must be a function or nil."
@@ -727,7 +753,111 @@ function superMegaAwesomeLibrary:SetESPPreviewEnabled(enabled)
     self:_UpdateESPPreview(0)
 end
 
+function superMegaAwesomeLibrary:_ResolveESPPreviewWalkAnimationId(sourceCharacter)
+    if not sourceCharacter then
+        return nil
+    end
+    local animateScript = sourceCharacter:FindFirstChild("Animate")
+    if animateScript then
+        local preferredFolders = {"walk", "run"}
+        for _, folderName in ipairs(preferredFolders) do
+            local folder = animateScript:FindFirstChild(folderName)
+            if folder then
+                local directAnimation = folder:FindFirstChildWhichIsA("Animation")
+                if directAnimation and type(directAnimation.AnimationId) == "string" and directAnimation.AnimationId ~= "" then
+                    return directAnimation.AnimationId
+                end
+                for _, child in ipairs(folder:GetDescendants()) do
+                    if child:IsA("Animation") and type(child.AnimationId) == "string" and child.AnimationId ~= "" then
+                        return child.AnimationId
+                    end
+                end
+            end
+        end
+        for _, child in ipairs(animateScript:GetDescendants()) do
+            if child:IsA("Animation") then
+                local childName = string.lower(child.Name or "")
+                if (string.find(childName, "walk", 1, true) or string.find(childName, "run", 1, true))
+                    and type(child.AnimationId) == "string"
+                    and child.AnimationId ~= "" then
+                    return child.AnimationId
+                end
+            end
+        end
+    end
+    return nil
+end
+
+function superMegaAwesomeLibrary:_StartESPPreviewWalkAnimation(sourceCharacter)
+    if not self._espPreviewCharacter or not self._espPreviewCharacter.Parent then
+        return
+    end
+    if self._espPreviewWalkTrack and self._espPreviewWalkTrack.IsPlaying and self._espPreviewAnimationId then
+        pcall(function()
+            self._espPreviewWalkTrack:AdjustSpeed(0.95)
+        end)
+        return
+    end
+    local previewHumanoid = self._espPreviewCharacter:FindFirstChildOfClass("Humanoid")
+    if not previewHumanoid then
+        return
+    end
+    local resolvedId = self:_ResolveESPPreviewWalkAnimationId(sourceCharacter)
+    if not resolvedId then
+        return
+    end
+    if self._espPreviewWalkTrack and self._espPreviewAnimationId ~= resolvedId then
+        pcall(function()
+            self._espPreviewWalkTrack:Stop(0.1)
+        end)
+        pcall(function()
+            self._espPreviewWalkTrack:Destroy()
+        end)
+        self._espPreviewWalkTrack = nil
+    end
+
+    local animator = previewHumanoid:FindFirstChildOfClass("Animator")
+    if not animator then
+        animator = Instance.new("Animator")
+        animator.Parent = previewHumanoid
+    end
+    if not self._espPreviewWalkTrack then
+        local walkAnimation = Instance.new("Animation")
+        walkAnimation.AnimationId = resolvedId
+        local okTrack, track = pcall(function()
+            return animator:LoadAnimation(walkAnimation)
+        end)
+        walkAnimation:Destroy()
+        if not okTrack or not track then
+            return
+        end
+        track.Looped = true
+        self._espPreviewWalkTrack = track
+        self._espPreviewAnimationId = resolvedId
+    end
+    if self._espPreviewWalkTrack and not self._espPreviewWalkTrack.IsPlaying then
+        pcall(function()
+            self._espPreviewWalkTrack:Play(0.15, 1, 1)
+        end)
+    end
+    if self._espPreviewWalkTrack then
+        pcall(function()
+            self._espPreviewWalkTrack:AdjustSpeed(0.95)
+        end)
+    end
+end
+
 function superMegaAwesomeLibrary:_DestroyESPPreviewCharacter()
+    if self._espPreviewWalkTrack then
+        pcall(function()
+            self._espPreviewWalkTrack:Stop(0.1)
+        end)
+        pcall(function()
+            self._espPreviewWalkTrack:Destroy()
+        end)
+    end
+    self._espPreviewWalkTrack = nil
+    self._espPreviewAnimationId = nil
     if self._espPreviewHighlight then
         self._espPreviewHighlight.Adornee = nil
         self._espPreviewHighlight.Enabled = false
@@ -766,24 +896,60 @@ function superMegaAwesomeLibrary:_EnsureESPPreviewCharacter()
         return
     end
 
+    local corePartCount = 0
+    local visibleCorePartCount = 0
     for _, obj in ipairs(cloneCharacter:GetDescendants()) do
         if obj:IsA("Script") or obj:IsA("LocalScript") then
             obj:Destroy()
         elseif obj:IsA("BasePart") then
+            local isCoreBodyPart = flowPreviewCoreBodyParts[obj.Name] == true
+            local sanitizedTransparency = math.clamp(obj.Transparency, 0, 1)
+            if isCoreBodyPart and sanitizedTransparency >= 0.98 then
+                sanitizedTransparency = 0
+            end
             self._espPreviewPartDefaults[obj] = {
                 Color = obj.Color,
                 Material = obj.Material,
-                Transparency = obj.Transparency
+                Transparency = sanitizedTransparency
             }
-            obj.Anchored = true
+            obj.Transparency = sanitizedTransparency
+            pcall(function()
+                obj.LocalTransparencyModifier = 0
+            end)
             obj.CanCollide = false
-            obj.CastShadow = false
+            obj.Massless = true
+            obj.CastShadow = not isCoreBodyPart
+            if obj.Name == "HumanoidRootPart" then
+                obj.Anchored = true
+            else
+                obj.Anchored = false
+            end
+            if isCoreBodyPart then
+                corePartCount = corePartCount + 1
+                if sanitizedTransparency < 0.98 then
+                    visibleCorePartCount = visibleCorePartCount + 1
+                end
+            end
+        end
+    end
+
+    if corePartCount > 0 and visibleCorePartCount < math.min(4, corePartCount) then
+        for part, originalData in pairs(self._espPreviewPartDefaults) do
+            if part and part.Parent and originalData and flowPreviewCoreBodyParts[part.Name] then
+                originalData.Transparency = 0
+                part.Transparency = 0
+            end
         end
     end
 
     cloneCharacter.Parent = self._espPreviewWorldModel
+    local previewHumanoid = cloneCharacter:FindFirstChildOfClass("Humanoid")
+    if previewHumanoid then
+        previewHumanoid.AutoRotate = false
+        previewHumanoid.PlatformStand = false
+    end
     pcall(function()
-        cloneCharacter:PivotTo(CFrame.new(0, -2.4, 0))
+        cloneCharacter:PivotTo(CFrame.new(0, -1.35, 0) * CFrame.Angles(0, math.rad(180), 0))
     end)
     self._espPreviewCharacter = cloneCharacter
     self._espPreviewLastCharacter = liveCharacter
@@ -792,17 +958,19 @@ function superMegaAwesomeLibrary:_EnsureESPPreviewCharacter()
     end
 
     if self._espPreviewCamera then
-        local focus = Vector3.new(0, 1.2, 0)
-        local depth = 7
+        local focus = Vector3.new(0, 1.25, 0)
+        local depth = 5.3
         local okExtents, extents = pcall(function()
             return cloneCharacter:GetExtentsSize()
         end)
         if okExtents and extents then
-            depth = math.max(6.2, math.max(extents.X, extents.Z) * 2.2 + extents.Y * 0.45)
-            focus = Vector3.new(0, math.clamp(extents.Y * 0.2, 1, 2), 0)
+            depth = math.max(5.0, math.max(extents.X, extents.Z) * 1.6 + extents.Y * 0.2)
+            focus = Vector3.new(0, math.clamp(extents.Y * 0.3, 1.18, 2.25), 0)
         end
+        self._espPreviewCamera.FieldOfView = 34
         self._espPreviewCamera.CFrame = CFrame.new(Vector3.new(0, focus.Y, depth), focus)
     end
+    self:_StartESPPreviewWalkAnimation(liveCharacter)
 end
 
 function superMegaAwesomeLibrary:_CreateESPPreviewPanel()
@@ -813,14 +981,14 @@ function superMegaAwesomeLibrary:_CreateESPPreviewPanel()
         return
     end
 
-    local panelWidth = 210 * mobileScaleFactor
-    local panelHeight = 272 * mobileScaleFactor
+    local panelWidth = 226 * mobileScaleFactor
+    local panelHeight = 296 * mobileScaleFactor
     local panel = makeThingExist("Frame", {
         Name = "FlowESPSelfPreviewPanel",
         BackgroundColor3 = Color3.fromRGB(14, 14, 16),
         BackgroundTransparency = 0.06,
         BorderSizePixel = 0,
-        Position = UDim2.new(0, 14 * mobileScaleFactor, 0, 64 * mobileScaleFactor),
+        Position = UDim2.new(0, 14 * mobileScaleFactor, 0, 66 * mobileScaleFactor),
         Size = UDim2.new(0, panelWidth, 0, panelHeight),
         Visible = false,
         ZIndex = 30,
@@ -868,7 +1036,7 @@ function superMegaAwesomeLibrary:_CreateESPPreviewPanel()
         BackgroundColor3 = Color3.fromRGB(11, 11, 13),
         BorderSizePixel = 0,
         Position = UDim2.new(0, 8 * mobileScaleFactor, 0, 28 * mobileScaleFactor),
-        Size = UDim2.new(1, -16 * mobileScaleFactor, 1, -36 * mobileScaleFactor),
+        Size = UDim2.new(1, -16 * mobileScaleFactor, 1, -34 * mobileScaleFactor),
         ZIndex = 30,
         Parent = panel
     })
@@ -876,14 +1044,17 @@ function superMegaAwesomeLibrary:_CreateESPPreviewPanel()
     makeThingExist("UIStroke", {Color = Color3.fromRGB(33, 33, 37), Parent = card})
 
     local viewport = makeThingExist("ViewportFrame", {
-        BackgroundTransparency = 1,
-        Position = UDim2.new(0, 8 * mobileScaleFactor, 0, 8 * mobileScaleFactor),
-        Size = UDim2.new(1, -16 * mobileScaleFactor, 1, -48 * mobileScaleFactor),
+        BackgroundColor3 = Color3.fromRGB(15, 15, 18),
+        BackgroundTransparency = 0.08,
+        Position = UDim2.new(0, 6 * mobileScaleFactor, 0, 6 * mobileScaleFactor),
+        Size = UDim2.new(1, -12 * mobileScaleFactor, 1, -44 * mobileScaleFactor),
         LightColor = Color3.new(1, 1, 1),
-        Ambient = Color3.fromRGB(96, 96, 102),
+        LightDirection = Vector3.new(-0.34, -1, -0.22),
+        Ambient = Color3.fromRGB(122, 122, 130),
         ZIndex = 31,
         Parent = card
     })
+    makeThingExist("UICorner", {CornerRadius = UDim.new(0, 7), Parent = viewport})
     local worldModel = makeThingExist("WorldModel", {Parent = viewport})
     local camera = makeThingExist("Camera", {
         CFrame = CFrame.new(Vector3.new(0, 1.4, 7.2), Vector3.new(0, 1.2, 0)),
@@ -938,6 +1109,7 @@ function superMegaAwesomeLibrary:_CreateESPPreviewPanel()
     self._espPreviewTracer = makeThingExist("Frame", {
         BackgroundColor3 = self.config.AccentColor,
         BorderSizePixel = 0,
+        AnchorPoint = Vector2.new(0.5, 1),
         Position = UDim2.new(0.5, -1 * mobileScaleFactor, 0.58, 0),
         Size = UDim2.new(0, 2 * mobileScaleFactor, 0.34, 0),
         Visible = false,
@@ -1318,6 +1490,9 @@ function superMegaAwesomeLibrary:_UpdateESPPreview(dt)
     local previewColor = state.Color or self.config.AccentColor
 
     self:_EnsureESPPreviewCharacter()
+    if not self._espPreviewWalkTrack or not self._espPreviewWalkTrack.IsPlaying then
+        self:_StartESPPreviewWalkAnimation(theOneAndOnlyPlayer.Character)
+    end
     if self._espPreviewHeaderTag then
         self._espPreviewHeaderTag.Text = "@" .. tostring(theOneAndOnlyPlayer.Name)
     end
@@ -1337,38 +1512,139 @@ function superMegaAwesomeLibrary:_UpdateESPPreview(dt)
     if self._espPreviewDot then self._espPreviewDot.BackgroundColor3 = previewColor end
     if self._espPreviewTracer then self._espPreviewTracer.BackgroundColor3 = previewColor end
 
+    local viewportCamera = self._espPreviewCamera or (self._espPreviewViewport and self._espPreviewViewport.CurrentCamera)
+    local viewportSize = self._espPreviewViewport and self._espPreviewViewport.AbsoluteSize or Vector2.new(0, 0)
+    local hasProjectedBox = false
+    local boxMinX, boxMinY = math.huge, math.huge
+    local boxMaxX, boxMaxY = -math.huge, -math.huge
+    local headScreenPos = nil
+    local rootScreenPos = nil
+
+    if viewportCamera and viewportSize.X > 2 and viewportSize.Y > 2 then
+        for _, part in ipairs(self._espPreviewCharacter:GetDescendants()) do
+            if part:IsA("BasePart") and part.Transparency < 0.98 and part.Size.Magnitude > 0 then
+                local halfSize = part.Size * 0.5
+                local partCF = part.CFrame
+                for xSign = -1, 1, 2 do
+                    for ySign = -1, 1, 2 do
+                        for zSign = -1, 1, 2 do
+                            local worldPoint = partCF:PointToWorldSpace(Vector3.new(halfSize.X * xSign, halfSize.Y * ySign, halfSize.Z * zSign))
+                            local screenPoint = viewportCamera:WorldToViewportPoint(worldPoint)
+                            if screenPoint.Z > 0 then
+                                hasProjectedBox = true
+                                boxMinX = math.min(boxMinX, screenPoint.X)
+                                boxMinY = math.min(boxMinY, screenPoint.Y)
+                                boxMaxX = math.max(boxMaxX, screenPoint.X)
+                                boxMaxY = math.max(boxMaxY, screenPoint.Y)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        local headPart = self._espPreviewCharacter:FindFirstChild("Head")
+            or self._espPreviewCharacter:FindFirstChild("UpperTorso")
+            or self._espPreviewCharacter:FindFirstChild("HumanoidRootPart")
+        if headPart then
+            local headWorld = headPart.Position + Vector3.new(0, math.max(0.1, headPart.Size.Y * 0.3), 0)
+            local headPoint = viewportCamera:WorldToViewportPoint(headWorld)
+            if headPoint.Z > 0 then
+                headScreenPos = Vector2.new(headPoint.X, headPoint.Y)
+            end
+        end
+        local rootPart = self._espPreviewCharacter:FindFirstChild("HumanoidRootPart")
+        if rootPart then
+            local rootPoint = viewportCamera:WorldToViewportPoint(rootPart.Position)
+            if rootPoint.Z > 0 then
+                rootScreenPos = Vector2.new(rootPoint.X, rootPoint.Y)
+            end
+        end
+    end
+
+    if hasProjectedBox then
+        boxMinX = math.clamp(boxMinX, 0, viewportSize.X)
+        boxMinY = math.clamp(boxMinY, 0, viewportSize.Y)
+        boxMaxX = math.clamp(boxMaxX, 0, viewportSize.X)
+        boxMaxY = math.clamp(boxMaxY, 0, viewportSize.Y)
+        if boxMaxX - boxMinX < 2 or boxMaxY - boxMinY < 2 then
+            hasProjectedBox = false
+        end
+    end
+
+    local showMaster = state.Enabled ~= false
     if self._espPreviewBox then
-        self._espPreviewBox.Visible = state.ShowBox == true and state.Enabled ~= false
+        local showBox = showMaster and state.ShowBox == true and hasProjectedBox
+        self._espPreviewBox.Visible = showBox
+        if showBox then
+            self._espPreviewBox.Position = UDim2.new(0, boxMinX, 0, boxMinY)
+            self._espPreviewBox.Size = UDim2.new(0, boxMaxX - boxMinX, 0, boxMaxY - boxMinY)
+        end
     end
     if self._espPreviewDot then
-        self._espPreviewDot.Visible = state.ShowDot == true and state.Enabled ~= false
+        local showDot = showMaster and state.ShowDot == true and headScreenPos ~= nil
+        self._espPreviewDot.Visible = showDot
+        if showDot then
+            local dotSize = math.max(5 * mobileScaleFactor, 1)
+            self._espPreviewDot.Position = UDim2.new(0, headScreenPos.X - dotSize * 0.5, 0, headScreenPos.Y - dotSize * 0.5)
+            self._espPreviewDot.Size = UDim2.new(0, dotSize, 0, dotSize)
+        end
     end
     if self._espPreviewTracer then
-        self._espPreviewTracer.Visible = state.ShowTracers == true and state.Enabled ~= false
+        local showTracer = showMaster and state.ShowTracers == true and (hasProjectedBox or rootScreenPos ~= nil)
+        self._espPreviewTracer.Visible = showTracer
+        if showTracer then
+            local fromX = viewportSize.X * 0.5
+            local fromY = viewportSize.Y - 1
+            local toX = rootScreenPos and rootScreenPos.X or (boxMinX + (boxMaxX - boxMinX) * 0.5)
+            local toY = rootScreenPos and rootScreenPos.Y or boxMaxY
+            local dx = toX - fromX
+            local dy = toY - fromY
+            local length = math.sqrt(dx * dx + dy * dy)
+            if length >= 2 then
+                self._espPreviewTracer.Position = UDim2.new(0, fromX, 0, fromY)
+                self._espPreviewTracer.Size = UDim2.new(0, 2 * mobileScaleFactor, 0, length)
+                self._espPreviewTracer.Rotation = math.deg(math.atan2(dy, dx)) + 90
+            else
+                self._espPreviewTracer.Visible = false
+            end
+        end
     end
 
     if self._espPreviewName then
-        self._espPreviewName.Visible = state.ShowName == true and state.Enabled ~= false
+        local showName = showMaster and state.ShowName == true and (hasProjectedBox or headScreenPos ~= nil)
+        self._espPreviewName.Visible = showName
         self._espPreviewName.Text = tostring(state.Name or theOneAndOnlyPlayer.Name)
         self._espPreviewName.TextColor3 = previewColor
+        if showName then
+            local nameWidth = hasProjectedBox and (boxMaxX - boxMinX + 20 * mobileScaleFactor) or (120 * mobileScaleFactor)
+            nameWidth = math.clamp(nameWidth, 70 * mobileScaleFactor, viewportSize.X)
+            local centerX = hasProjectedBox and (boxMinX + (boxMaxX - boxMinX) * 0.5) or headScreenPos.X
+            local nameX = math.clamp(centerX - nameWidth * 0.5, 0, math.max(0, viewportSize.X - nameWidth))
+            local nameY = hasProjectedBox and math.max(0, boxMinY - 16 * mobileScaleFactor) or math.max(0, headScreenPos.Y - 16 * mobileScaleFactor)
+            self._espPreviewName.Position = UDim2.new(0, nameX, 0, nameY)
+            self._espPreviewName.Size = UDim2.new(0, nameWidth, 0, 14 * mobileScaleFactor)
+        end
     end
 
     if self._espPreviewItem then
-        self._espPreviewItem.Visible = state.ShowItem == true and state.Enabled ~= false
+        self._espPreviewItem.Visible = state.ShowItem == true and showMaster
         self._espPreviewItem.Text = tostring(state.Item or "None")
         self._espPreviewItem.TextColor3 = previewColor
     end
 
     if self._espPreviewDistance then
-        self._espPreviewDistance.Visible = state.ShowDistance == true and state.Enabled ~= false
+        self._espPreviewDistance.Visible = state.ShowDistance == true and showMaster
         self._espPreviewDistance.Text = tostring(state.DistanceText or "0m")
         self._espPreviewDistance.TextColor3 = previewColor
     end
 
     if self._espPreviewHealthTrack then
-        local showHealth = state.ShowHealth == true and state.Enabled ~= false
+        local showHealth = state.ShowHealth == true and showMaster and hasProjectedBox
         self._espPreviewHealthTrack.Visible = showHealth
         if showHealth and self._espPreviewHealthFill then
+            self._espPreviewHealthTrack.Position = UDim2.new(0, math.max(0, boxMinX - 5 * mobileScaleFactor), 0, boxMinY)
+            self._espPreviewHealthTrack.Size = UDim2.new(0, 3 * mobileScaleFactor, 0, boxMaxY - boxMinY)
             local hpPercent = math.clamp(tonumber(state.HealthPercent) or 1, 0, 1)
             self._espPreviewHealthFill.Size = UDim2.new(1, 0, hpPercent, 0)
             self._espPreviewHealthFill.BackgroundColor3 = Color3.new(1 - hpPercent, hpPercent, 0)
@@ -4882,6 +5158,8 @@ function superMegaAwesomeLibrary:Destroy()
     self._espPreviewState = nil
     self._espPreviewProvider = nil
     self._espPreviewData = nil
+    self._espPreviewWalkTrack = nil
+    self._espPreviewAnimationId = nil
 
     if self._blurEffectRef and self._blurEffectRef.Parent then
         self._blurEffectRef:Destroy()
