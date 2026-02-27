@@ -138,6 +138,29 @@ local function getPlayerAvatarCuzTheyreBeautiful(userId)
     return "rbxassetid://135756197673563"
 end
 
+local function resolveAvatar3DUserIdFromRobloxEndpoint(defaultUserId)
+    local fallbackUserId = tonumber(defaultUserId) or 1
+    local endpoint = "https://thumbnails.roblox.com/v1/users/avatar-3d?userId=" .. tostring(fallbackUserId)
+
+    local okBody, rawBody = pcall(function()
+        return game:HttpGet(endpoint)
+    end)
+    if not okBody or type(rawBody) ~= "string" or rawBody == "" then
+        return fallbackUserId, nil
+    end
+
+    local okDecode, payload = pcall(function()
+        return httpServiceNoCap:JSONDecode(rawBody)
+    end)
+    if not okDecode or type(payload) ~= "table" then
+        return fallbackUserId, nil
+    end
+
+    local resolvedUserId = tonumber(payload.targetId) or tonumber(payload.userId) or fallbackUserId
+    local imageUrl = type(payload.imageUrl) == "string" and payload.imageUrl or nil
+    return resolvedUserId, imageUrl
+end
+
 local function howWideIsThisText(text, textSize, font)
     local textBoundsYay = textServiceBeLikeText:GetTextSize(text, textSize, font or Enum.Font.GothamSemibold, Vector2.new(math.huge, math.huge))
     return textBoundsYay.X
@@ -282,6 +305,15 @@ function superMegaAwesomeLibrary.new(config)
     self._espPreviewDistance = nil
     self._espPreviewWalkTrack = nil
     self._espPreviewAnimationId = nil
+    self._espPreviewAvatar3DUserId = tonumber(theOneAndOnlyPlayer.UserId) or 0
+    self._espPreviewAvatar3DImageUrl = nil
+    self._espPreviewRotationYaw = math.rad(180)
+    self._espPreviewRotationTargetYaw = math.rad(180)
+    self._espPreviewPivotYOffset = -2
+    self._espPreviewRotateCapture = nil
+    self._espPreviewIsRotating = false
+    self._espPreviewRotateInput = nil
+    self._espPreviewRotateLastX = 0
     
     self:CreateUIBecauseWeNeedIt()
     
@@ -849,12 +881,16 @@ end
 function superMegaAwesomeLibrary:_CreateESPPreviewFallbackCharacter()
     local fallbackModel = nil
     local created = false
+    local previewUserId, previewImageUrl = resolveAvatar3DUserIdFromRobloxEndpoint(theOneAndOnlyPlayer.UserId)
+    self._espPreviewAvatar3DUserId = previewUserId
+    self._espPreviewAvatar3DImageUrl = previewImageUrl
+
     local okCreate = pcall(function()
-        fallbackModel = playersAreNoobs:CreateHumanoidModelFromUserId(theOneAndOnlyPlayer.UserId)
+        fallbackModel = playersAreNoobs:CreateHumanoidModelFromUserId(previewUserId)
     end)
     if not okCreate or not fallbackModel then
         local okDescription, humanoidDescription = pcall(function()
-            return playersAreNoobs:GetHumanoidDescriptionFromUserId(theOneAndOnlyPlayer.UserId)
+            return playersAreNoobs:GetHumanoidDescriptionFromUserId(previewUserId)
         end)
         if okDescription and humanoidDescription then
             pcall(function()
@@ -894,6 +930,7 @@ function superMegaAwesomeLibrary:_DestroyESPPreviewCharacter()
     end
     self._espPreviewCharacter = nil
     self._espPreviewLastCharacter = nil
+    self._espPreviewPivotYOffset = -2
 end
 
 function superMegaAwesomeLibrary:_EnsureESPPreviewCharacter()
@@ -1021,16 +1058,20 @@ function superMegaAwesomeLibrary:_EnsureESPPreviewCharacter()
         return visiblePartCount >= 6
     end
 
-    local previewCharacter = cloneFromLiveCharacter()
-    local hasReliableClone = preparePreviewCharacter(previewCharacter)
-    if not hasReliableClone and previewCharacter and previewCharacter.Parent == nil then
+    local previewCharacter = self:_CreateESPPreviewFallbackCharacter()
+    local hasReliableAvatar = preparePreviewCharacter(previewCharacter)
+    if not hasReliableAvatar and previewCharacter and previewCharacter.Parent == nil then
         previewCharacter:Destroy()
         previewCharacter = nil
     end
 
     if not previewCharacter then
-        previewCharacter = self:_CreateESPPreviewFallbackCharacter()
-        preparePreviewCharacter(previewCharacter)
+        previewCharacter = cloneFromLiveCharacter()
+        local hasReliableClone = preparePreviewCharacter(previewCharacter)
+        if not hasReliableClone and previewCharacter and previewCharacter.Parent == nil then
+            previewCharacter:Destroy()
+            previewCharacter = nil
+        end
     end
     if not previewCharacter then
         return
@@ -1053,8 +1094,12 @@ function superMegaAwesomeLibrary:_EnsureESPPreviewCharacter()
         previewExtents = calculatedPreviewExtents
     end
     local pivotYOffset = -math.clamp(previewExtents.Y * 0.43, 1.2, 3.2)
+    self._espPreviewPivotYOffset = pivotYOffset
+    local initialYaw = tonumber(self._espPreviewRotationYaw) or tonumber(self._espPreviewRotationTargetYaw) or math.rad(180)
+    self._espPreviewRotationYaw = initialYaw
+    self._espPreviewRotationTargetYaw = initialYaw
     pcall(function()
-        previewCharacter:PivotTo(CFrame.new(0, pivotYOffset, 0) * CFrame.Angles(0, math.rad(180), 0))
+        previewCharacter:PivotTo(CFrame.new(0, pivotYOffset, 0) * CFrame.Angles(0, initialYaw, 0))
     end)
     self._espPreviewCharacter = previewCharacter
     self._espPreviewLastCharacter = liveCharacter or false
@@ -1108,9 +1153,9 @@ function superMegaAwesomeLibrary:_CreateESPPreviewPanel()
         AutoButtonColor = false,
         BackgroundTransparency = 1,
         Position = UDim2.new(0, 0, 0, 0),
-        Size = UDim2.new(1, 0, 1, 0),
+        Size = UDim2.new(1, 0, 0, 24 * mobileScaleFactor),
         Active = true,
-        ZIndex = 35,
+        ZIndex = 36,
         Parent = panel
     })
 
@@ -1157,6 +1202,7 @@ function superMegaAwesomeLibrary:_CreateESPPreviewPanel()
         BackgroundTransparency = 0.08,
         Position = UDim2.new(0, 6 * mobileScaleFactor, 0, 6 * mobileScaleFactor),
         Size = UDim2.new(1, -12 * mobileScaleFactor, 1, -44 * mobileScaleFactor),
+        Active = true,
         LightColor = Color3.new(1, 1, 1),
         LightDirection = Vector3.new(-0.34, -1, -0.22),
         Ambient = Color3.fromRGB(122, 122, 130),
@@ -1170,6 +1216,19 @@ function superMegaAwesomeLibrary:_CreateESPPreviewPanel()
         Parent = viewport
     })
     viewport.CurrentCamera = camera
+
+    local rotateCapture = makeThingExist("TextButton", {
+        Name = "ESPPreviewRotateCapture",
+        Text = "",
+        AutoButtonColor = false,
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0, 0, 0, 0),
+        Size = UDim2.new(1, 0, 1, 0),
+        Active = true,
+        Selectable = false,
+        ZIndex = 35,
+        Parent = viewport
+    })
 
     self._espPreviewBox = makeThingExist("Frame", {
         BackgroundTransparency = 1,
@@ -1280,6 +1339,65 @@ function superMegaAwesomeLibrary:_CreateESPPreviewPanel()
     self._espPreviewViewport = viewport
     self._espPreviewWorldModel = worldModel
     self._espPreviewCamera = camera
+    self._espPreviewRotateCapture = rotateCapture
+
+    local function stopESPPreviewRotate()
+        self._espPreviewIsRotating = false
+        self._espPreviewRotateInput = nil
+    end
+
+    self:_TrackConnection(rotateCapture.InputBegan:Connect(function(input)
+        local isMouse = input.UserInputType == Enum.UserInputType.MouseButton1
+        local isTouch = input.UserInputType == Enum.UserInputType.Touch
+        if not isMouse and not isTouch then
+            return
+        end
+        self._espPreviewIsRotating = true
+        self._espPreviewRotateInput = isTouch and input or nil
+        self._espPreviewRotateLastX = input.Position.X
+    end))
+
+    self:_TrackConnection(rotateCapture.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            stopESPPreviewRotate()
+            return
+        end
+        if input.UserInputType == Enum.UserInputType.Touch and (self._espPreviewRotateInput == nil or input == self._espPreviewRotateInput) then
+            stopESPPreviewRotate()
+        end
+    end))
+
+    self:_TrackConnection(thisInputServiceGoesHard.InputChanged:Connect(function(input)
+        if not self._espPreviewIsRotating then
+            return
+        end
+        local isMouseMove = input.UserInputType == Enum.UserInputType.MouseMovement and self._espPreviewRotateInput == nil
+        local isTouchMove = input.UserInputType == Enum.UserInputType.Touch and (self._espPreviewRotateInput == nil or input == self._espPreviewRotateInput)
+        if not isMouseMove and not isTouchMove then
+            return
+        end
+
+        local previousX = tonumber(self._espPreviewRotateLastX) or input.Position.X
+        local deltaX = input.Position.X - previousX
+        self._espPreviewRotateLastX = input.Position.X
+
+        local rotationSensitivity = isMobileUserSadly and 0.02 or 0.015
+        self._espPreviewRotationTargetYaw = (tonumber(self._espPreviewRotationTargetYaw) or math.rad(180)) - deltaX * rotationSensitivity
+    end))
+
+    self:_TrackConnection(thisInputServiceGoesHard.InputEnded:Connect(function(input)
+        if not self._espPreviewIsRotating then
+            return
+        end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            stopESPPreviewRotate()
+            return
+        end
+        if input.UserInputType == Enum.UserInputType.Touch and (self._espPreviewRotateInput == nil or input == self._espPreviewRotateInput) then
+            stopESPPreviewRotate()
+        end
+    end))
+
     makeDraggableCuzWeCan(panel, panelDragHandle, self)
     self:_EnsureESPPreviewCharacter()
     self:_UpdateESPPreview(0)
@@ -1600,6 +1718,20 @@ function superMegaAwesomeLibrary:_UpdateESPPreview(dt)
     local previewColor = state.Color or self.config.AccentColor
 
     self:_EnsureESPPreviewCharacter()
+    if self._espPreviewCharacter and self._espPreviewCharacter.Parent then
+        local currentYaw = tonumber(self._espPreviewRotationYaw) or math.rad(180)
+        local targetYaw = tonumber(self._espPreviewRotationTargetYaw) or currentYaw
+        local yawDelta = math.atan2(math.sin(targetYaw - currentYaw), math.cos(targetYaw - currentYaw))
+        local yawAlpha = math.clamp((dt or (1 / 60)) * 14, 0.08, 0.58)
+        if math.abs(yawDelta) > 0.0004 then
+            currentYaw = currentYaw + yawDelta * yawAlpha
+            self._espPreviewRotationYaw = currentYaw
+            local pivotYOffset = tonumber(self._espPreviewPivotYOffset) or -2
+            pcall(function()
+                self._espPreviewCharacter:PivotTo(CFrame.new(0, pivotYOffset, 0) * CFrame.Angles(0, currentYaw, 0))
+            end)
+        end
+    end
     if not self._espPreviewWalkTrack or not self._espPreviewWalkTrack.IsPlaying then
         self:_StartESPPreviewWalkAnimation(theOneAndOnlyPlayer.Character)
     end
@@ -5427,6 +5559,15 @@ function superMegaAwesomeLibrary:Destroy()
     self._espPreviewData = nil
     self._espPreviewWalkTrack = nil
     self._espPreviewAnimationId = nil
+    self._espPreviewAvatar3DUserId = nil
+    self._espPreviewAvatar3DImageUrl = nil
+    self._espPreviewRotationYaw = nil
+    self._espPreviewRotationTargetYaw = nil
+    self._espPreviewPivotYOffset = nil
+    self._espPreviewRotateCapture = nil
+    self._espPreviewIsRotating = false
+    self._espPreviewRotateInput = nil
+    self._espPreviewRotateLastX = nil
 
     if self._blurEffectRef and self._blurEffectRef.Parent then
         self._blurEffectRef:Destroy()
@@ -5451,6 +5592,7 @@ function superMegaAwesomeLibrary:Destroy()
     self._espPreviewName = nil
     self._espPreviewItem = nil
     self._espPreviewDistance = nil
+    self._espPreviewRotateCapture = nil
 
     if self.screenGuiYay and self.screenGuiYay.Parent then
         self.screenGuiYay:Destroy()
