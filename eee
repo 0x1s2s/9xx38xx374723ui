@@ -318,6 +318,7 @@ function superMegaAwesomeLibrary.new(config)
     self._espPreviewAvatar3DImageUrl = nil
     self._espPreviewRotationYaw = math.rad(180)
     self._espPreviewRotationTargetYaw = math.rad(180)
+    self._espPreviewStaticMode = true
     self._espPreviewPivotYOffset = -2
     self._espPreviewRotateCapture = nil
     self._espPreviewIsRotating = false
@@ -880,6 +881,19 @@ function superMegaAwesomeLibrary:_ResolveESPPreviewWalkAnimationId(sourceCharact
 end
 
 function superMegaAwesomeLibrary:_StartESPPreviewWalkAnimation(sourceCharacter)
+    if self._espPreviewStaticMode then
+        if self._espPreviewWalkTrack then
+            pcall(function()
+                self._espPreviewWalkTrack:Stop(0.1)
+            end)
+            pcall(function()
+                self._espPreviewWalkTrack:Destroy()
+            end)
+            self._espPreviewWalkTrack = nil
+        end
+        self._espPreviewAnimationId = nil
+        return
+    end
     if not self._espPreviewCharacter or not self._espPreviewCharacter.Parent then
         return
     end
@@ -1153,9 +1167,9 @@ function superMegaAwesomeLibrary:_EnsureESPPreviewCharacter()
     if okPreviewExtents and calculatedPreviewExtents then
         previewExtents = calculatedPreviewExtents
     end
-    local pivotYOffset = -math.clamp(previewExtents.Y * 0.43, 1.2, 3.2)
+    local pivotYOffset = self._espPreviewStaticMode and 0 or -math.clamp(previewExtents.Y * 0.43, 1.2, 3.2)
     self._espPreviewPivotYOffset = pivotYOffset
-    local initialYaw = tonumber(self._espPreviewRotationYaw) or tonumber(self._espPreviewRotationTargetYaw) or math.rad(180)
+    local initialYaw = self._espPreviewStaticMode and math.rad(180) or (tonumber(self._espPreviewRotationYaw) or tonumber(self._espPreviewRotationTargetYaw) or math.rad(180))
     self._espPreviewRotationYaw = initialYaw
     self._espPreviewRotationTargetYaw = initialYaw
     pcall(function()
@@ -1168,12 +1182,62 @@ function superMegaAwesomeLibrary:_EnsureESPPreviewCharacter()
     end
 
     if self._espPreviewCamera then
-        local focus = Vector3.new(0, math.clamp(previewExtents.Y * 0.36, 1.2, 2.45), 0)
-        local depth = math.clamp(math.max(6.8, previewExtents.Y * 1.05 + previewExtents.X * 0.65), 6.8, 18)
-        self._espPreviewCamera.FieldOfView = 32
-        self._espPreviewCamera.CFrame = CFrame.new(Vector3.new(0, focus.Y, depth), focus)
+        if self._espPreviewStaticMode then
+            self._espPreviewCamera.FieldOfView = 30
+            local minVec = Vector3.new(math.huge, math.huge, math.huge)
+            local maxVec = Vector3.new(-math.huge, -math.huge, -math.huge)
+            local partCount = 0
+            for _, part in ipairs(previewCharacter:GetDescendants()) do
+                if part:IsA("BasePart") and part.Transparency < 0.985 and part.Size.Magnitude > 0.05 then
+                    partCount = partCount + 1
+                    local halfSize = part.Size * 0.5
+                    local partCF = part.CFrame
+                    for xSign = -1, 1, 2 do
+                        for ySign = -1, 1, 2 do
+                            for zSign = -1, 1, 2 do
+                                local worldPoint = partCF:PointToWorldSpace(Vector3.new(halfSize.X * xSign, halfSize.Y * ySign, halfSize.Z * zSign))
+                                minVec = Vector3.new(
+                                    math.min(minVec.X, worldPoint.X),
+                                    math.min(minVec.Y, worldPoint.Y),
+                                    math.min(minVec.Z, worldPoint.Z)
+                                )
+                                maxVec = Vector3.new(
+                                    math.max(maxVec.X, worldPoint.X),
+                                    math.max(maxVec.Y, worldPoint.Y),
+                                    math.max(maxVec.Z, worldPoint.Z)
+                                )
+                            end
+                        end
+                    end
+                end
+            end
+            if partCount > 0 then
+                local boundsSize = maxVec - minVec
+                local boundsCenter = minVec + boundsSize * 0.5
+                local viewportSize = self._espPreviewViewport and self._espPreviewViewport.AbsoluteSize or Vector2.new(1, 1)
+                local aspectRatio = math.max(0.5, viewportSize.X / math.max(1, viewportSize.Y))
+                local verticalHalfFov = math.rad(self._espPreviewCamera.FieldOfView) * 0.5
+                local horizontalHalfFov = math.atan(math.tan(verticalHalfFov) * aspectRatio)
+                local fitDepthY = (boundsSize.Y * 0.5) / math.max(0.001, math.tan(verticalHalfFov))
+                local fitDepthX = (boundsSize.X * 0.5) / math.max(0.001, math.tan(horizontalHalfFov))
+                local depth = math.max(fitDepthX, fitDepthY) + boundsSize.Z * 0.92 + 1.25
+                depth = math.clamp(depth, 7.2, 16.2)
+                local focus = boundsCenter + Vector3.new(0, math.clamp(boundsSize.Y * 0.03, -0.08, 0.25), 0)
+                self._espPreviewCamera.CFrame = CFrame.new(focus + Vector3.new(0, math.clamp(boundsSize.Y * 0.03, -0.08, 0.35), depth), focus)
+            else
+                local fallbackFocus = Vector3.new(0, 0.45, 0)
+                self._espPreviewCamera.CFrame = CFrame.new(Vector3.new(0, fallbackFocus.Y, 9.2), fallbackFocus)
+            end
+        else
+            local focus = Vector3.new(0, math.clamp(previewExtents.Y * 0.36, 1.2, 2.45), 0)
+            local depth = math.clamp(math.max(6.8, previewExtents.Y * 1.05 + previewExtents.X * 0.65), 6.8, 18)
+            self._espPreviewCamera.FieldOfView = 32
+            self._espPreviewCamera.CFrame = CFrame.new(Vector3.new(0, focus.Y, depth), focus)
+        end
     end
-    self:_StartESPPreviewWalkAnimation(liveCharacter)
+    if not self._espPreviewStaticMode then
+        self:_StartESPPreviewWalkAnimation(liveCharacter)
+    end
 end
 
 function superMegaAwesomeLibrary:_CreateESPPreviewPanel()
@@ -1294,7 +1358,7 @@ function superMegaAwesomeLibrary:_CreateESPPreviewPanel()
         BackgroundTransparency = 1,
         Position = UDim2.new(0, 0, 0, 0),
         Size = UDim2.new(1, 0, 1, 0),
-        Active = true,
+        Active = not self._espPreviewStaticMode,
         Selectable = false,
         ZIndex = 35,
         Parent = viewport
@@ -1411,62 +1475,68 @@ function superMegaAwesomeLibrary:_CreateESPPreviewPanel()
     self._espPreviewCamera = camera
     self._espPreviewRotateCapture = rotateCapture
 
-    local function stopESPPreviewRotate()
+    if not self._espPreviewStaticMode then
+        local function stopESPPreviewRotate()
+            self._espPreviewIsRotating = false
+            self._espPreviewRotateInput = nil
+        end
+
+        self:_TrackConnection(rotateCapture.InputBegan:Connect(function(input)
+            local isMouse = input.UserInputType == Enum.UserInputType.MouseButton1
+            local isTouch = input.UserInputType == Enum.UserInputType.Touch
+            if not isMouse and not isTouch then
+                return
+            end
+            self._espPreviewIsRotating = true
+            self._espPreviewRotateInput = isTouch and input or nil
+            self._espPreviewRotateLastX = input.Position.X
+        end))
+
+        self:_TrackConnection(rotateCapture.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                stopESPPreviewRotate()
+                return
+            end
+            if input.UserInputType == Enum.UserInputType.Touch and (self._espPreviewRotateInput == nil or input == self._espPreviewRotateInput) then
+                stopESPPreviewRotate()
+            end
+        end))
+
+        self:_TrackConnection(thisInputServiceGoesHard.InputChanged:Connect(function(input)
+            if not self._espPreviewIsRotating then
+                return
+            end
+            local isMouseMove = input.UserInputType == Enum.UserInputType.MouseMovement and self._espPreviewRotateInput == nil
+            local isTouchMove = input.UserInputType == Enum.UserInputType.Touch and (self._espPreviewRotateInput == nil or input == self._espPreviewRotateInput)
+            if not isMouseMove and not isTouchMove then
+                return
+            end
+
+            local previousX = tonumber(self._espPreviewRotateLastX) or input.Position.X
+            local deltaX = input.Position.X - previousX
+            self._espPreviewRotateLastX = input.Position.X
+
+            local rotationSensitivity = isMobileUserSadly and 0.02 or 0.015
+            self._espPreviewRotationTargetYaw = (tonumber(self._espPreviewRotationTargetYaw) or math.rad(180)) - deltaX * rotationSensitivity
+        end))
+
+        self:_TrackConnection(thisInputServiceGoesHard.InputEnded:Connect(function(input)
+            if not self._espPreviewIsRotating then
+                return
+            end
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                stopESPPreviewRotate()
+                return
+            end
+            if input.UserInputType == Enum.UserInputType.Touch and (self._espPreviewRotateInput == nil or input == self._espPreviewRotateInput) then
+                stopESPPreviewRotate()
+            end
+        end))
+    else
         self._espPreviewIsRotating = false
         self._espPreviewRotateInput = nil
+        self._espPreviewRotateLastX = 0
     end
-
-    self:_TrackConnection(rotateCapture.InputBegan:Connect(function(input)
-        local isMouse = input.UserInputType == Enum.UserInputType.MouseButton1
-        local isTouch = input.UserInputType == Enum.UserInputType.Touch
-        if not isMouse and not isTouch then
-            return
-        end
-        self._espPreviewIsRotating = true
-        self._espPreviewRotateInput = isTouch and input or nil
-        self._espPreviewRotateLastX = input.Position.X
-    end))
-
-    self:_TrackConnection(rotateCapture.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            stopESPPreviewRotate()
-            return
-        end
-        if input.UserInputType == Enum.UserInputType.Touch and (self._espPreviewRotateInput == nil or input == self._espPreviewRotateInput) then
-            stopESPPreviewRotate()
-        end
-    end))
-
-    self:_TrackConnection(thisInputServiceGoesHard.InputChanged:Connect(function(input)
-        if not self._espPreviewIsRotating then
-            return
-        end
-        local isMouseMove = input.UserInputType == Enum.UserInputType.MouseMovement and self._espPreviewRotateInput == nil
-        local isTouchMove = input.UserInputType == Enum.UserInputType.Touch and (self._espPreviewRotateInput == nil or input == self._espPreviewRotateInput)
-        if not isMouseMove and not isTouchMove then
-            return
-        end
-
-        local previousX = tonumber(self._espPreviewRotateLastX) or input.Position.X
-        local deltaX = input.Position.X - previousX
-        self._espPreviewRotateLastX = input.Position.X
-
-        local rotationSensitivity = isMobileUserSadly and 0.02 or 0.015
-        self._espPreviewRotationTargetYaw = (tonumber(self._espPreviewRotationTargetYaw) or math.rad(180)) - deltaX * rotationSensitivity
-    end))
-
-    self:_TrackConnection(thisInputServiceGoesHard.InputEnded:Connect(function(input)
-        if not self._espPreviewIsRotating then
-            return
-        end
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            stopESPPreviewRotate()
-            return
-        end
-        if input.UserInputType == Enum.UserInputType.Touch and (self._espPreviewRotateInput == nil or input == self._espPreviewRotateInput) then
-            stopESPPreviewRotate()
-        end
-    end))
 
     makeDraggableCuzWeCan(panel, panelDragHandle, self)
     self:_EnsureESPPreviewCharacter()
@@ -1826,7 +1896,7 @@ function superMegaAwesomeLibrary:_UpdateESPPreview(dt)
     )
 
     self:_EnsureESPPreviewCharacter()
-    if self._espPreviewCharacter and self._espPreviewCharacter.Parent then
+    if not self._espPreviewStaticMode and self._espPreviewCharacter and self._espPreviewCharacter.Parent then
         local currentYaw = tonumber(self._espPreviewRotationYaw) or math.rad(180)
         local targetYaw = tonumber(self._espPreviewRotationTargetYaw) or currentYaw
         local yawDelta = math.atan2(math.sin(targetYaw - currentYaw), math.cos(targetYaw - currentYaw))
@@ -1840,7 +1910,7 @@ function superMegaAwesomeLibrary:_UpdateESPPreview(dt)
             end)
         end
     end
-    if not self._espPreviewWalkTrack or not self._espPreviewWalkTrack.IsPlaying then
+    if not self._espPreviewStaticMode and (not self._espPreviewWalkTrack or not self._espPreviewWalkTrack.IsPlaying) then
         self:_StartESPPreviewWalkAnimation(theOneAndOnlyPlayer.Character)
     end
     if self._espPreviewHeaderTag then
@@ -1938,7 +2008,7 @@ function superMegaAwesomeLibrary:_UpdateESPPreview(dt)
         return minVec, maxVec
     end
 
-    if needsProjection and viewportCamera and viewportSize.X > 2 and viewportSize.Y > 2 and #projectParts > 0 then
+    if not self._espPreviewStaticMode and needsProjection and viewportCamera and viewportSize.X > 2 and viewportSize.Y > 2 and #projectParts > 0 then
         viewportCamera.FieldOfView = 32
         local boundsMin, boundsMax = getWorldBounds(projectParts)
         if boundsMin and boundsMax then
