@@ -249,9 +249,11 @@ function superMegaAwesomeLibrary.new(config)
     self._trackedControls = {}
     self._smoothScrollFrames = {}
     self._searchQuery = ""
-    self._fpsRollingWindow = {}
-    self._fpsRollingTotal = 0
     self._fpsRollingSize = 60
+    self._fpsRollingWindow = table.create and table.create(self._fpsRollingSize, 0) or {}
+    self._fpsRollingTotal = 0
+    self._fpsRollingIndex = 1
+    self._fpsRollingCount = 0
     self._latestFPSValue = 0
     self._blurEffectRef = nil
     self._snowflakes = {}
@@ -260,13 +262,16 @@ function superMegaAwesomeLibrary.new(config)
     self._overlayMode = "Snow"
     self._overlayModes = {"Snow", "Rain", "Stars", "None"}
     self._backgroundFxTime = 0
+    self._backgroundFxAccumulator = 0
     self._textGradientAnimationTime = 0
+    self._gradientAnimationAccumulator = 0
+    self._overlayUpdateAccumulator = 0
     self._uiVisualSettings = {
-        Blur = false,
-        Snow = false,
-        BackgroundEffects = false,
-        TextGradient = false,
-        ESPSelfPreview = false
+        Blur = true,
+        Snow = true,
+        BackgroundEffects = true,
+        TextGradient = true,
+        ESPSelfPreview = true
     }
     self._fontPresets = {
         {Name = "Gotham", EnumFont = Enum.Font.Gotham, Family = "rbxasset://fonts/families/GothamSSm.json", Weight = Enum.FontWeight.SemiBold},
@@ -282,6 +287,7 @@ function superMegaAwesomeLibrary.new(config)
     }
     self._fontPresetIndex = 1
     self._gradientLabels = {}
+    self._gradientObjects = {}
     self._espPreviewProvider = nil
     self._espPreviewData = nil
     self._espPreviewState = nil
@@ -542,6 +548,7 @@ function superMegaAwesomeLibrary:_SetSnowEnabled(enabled)
         self.snowLayerFrame.Visible = self._uiVisualSettings.Snow and self.isToggledOn and self._overlayMode ~= "None"
     end
     if not self._uiVisualSettings.Snow or not self.isToggledOn or self._overlayMode == "None" then
+        self._overlayUpdateAccumulator = 0
         self._snowSpawnAccumulator = 0
         self:_ClearSnowflakes()
     end
@@ -566,6 +573,7 @@ function superMegaAwesomeLibrary:_SetOverlayMode(mode)
         self.snowLayerFrame.Visible = self.isToggledOn and self._uiVisualSettings.Snow and resolved ~= "None"
     end
     if changed or resolved == "None" then
+        self._overlayUpdateAccumulator = 0
         self._snowSpawnAccumulator = 0
         self:_ClearSnowflakes()
     end
@@ -573,6 +581,9 @@ end
 
 function superMegaAwesomeLibrary:_SetBackgroundEffectsEnabled(enabled)
     self._uiVisualSettings.BackgroundEffects = enabled == true
+    if not self._uiVisualSettings.BackgroundEffects then
+        self._backgroundFxAccumulator = 0
+    end
     if self.mainBackgroundEffectsFrame then
         self.mainBackgroundEffectsFrame.Visible = self._uiVisualSettings.BackgroundEffects
     end
@@ -580,10 +591,16 @@ end
 
 function superMegaAwesomeLibrary:_SetTextGradientEnabled(enabled)
     self._uiVisualSettings.TextGradient = enabled == true
+    if not self._uiVisualSettings.TextGradient then
+        self._gradientAnimationAccumulator = 0
+    end
     local accent = self.config.AccentColor
     local gradientSweepSpeed = 0.9
     local animationTime = tonumber(self._textGradientAnimationTime) or 0
     local sweepX = ((animationTime * gradientSweepSpeed) % 2) - 1
+    for i = #self._gradientObjects, 1, -1 do
+        self._gradientObjects[i] = nil
+    end
     for _, label in ipairs(self._gradientLabels) do
         if label and label.Parent then
             local gradientObj = label:FindFirstChild("FlowUITextGradient")
@@ -602,6 +619,7 @@ function superMegaAwesomeLibrary:_SetTextGradientEnabled(enabled)
                     ColorSequenceKeypoint.new(1, accent:Lerp(Color3.new(1, 1, 1), 0.35))
                 })
                 gradientObj.Offset = Vector2.new(sweepX, 0)
+                table.insert(self._gradientObjects, gradientObj)
             elseif gradientObj then
                 gradientObj:Destroy()
             end
@@ -614,18 +632,25 @@ function superMegaAwesomeLibrary:_AnimateTextGradients(dt)
         return
     end
 
+    self._gradientAnimationAccumulator = (tonumber(self._gradientAnimationAccumulator) or 0) + (dt or 0)
+    if self._gradientAnimationAccumulator < (1 / 30) then
+        return
+    end
+    local resolvedDt = self._gradientAnimationAccumulator
+    self._gradientAnimationAccumulator = 0
+
     local gradientSweepSpeed = 0.9
-    self._textGradientAnimationTime = (tonumber(self._textGradientAnimationTime) or 0) + (dt or 0)
+    self._textGradientAnimationTime = (tonumber(self._textGradientAnimationTime) or 0) + resolvedDt
     local sweepX = ((self._textGradientAnimationTime * gradientSweepSpeed) % 2) - 1
     local animatedOffset = Vector2.new(sweepX, 0)
 
-    for _, label in ipairs(self._gradientLabels) do
-        if label and label.Parent then
-            local gradientObj = label:FindFirstChild("FlowUITextGradient")
-            if gradientObj then
-                gradientObj.Rotation = 0
-                gradientObj.Offset = animatedOffset
-            end
+    for i = #self._gradientObjects, 1, -1 do
+        local gradientObj = self._gradientObjects[i]
+        if gradientObj and gradientObj.Parent then
+            gradientObj.Rotation = 0
+            gradientObj.Offset = animatedOffset
+        else
+            table.remove(self._gradientObjects, i)
         end
     end
 end
@@ -710,6 +735,7 @@ function superMegaAwesomeLibrary:_ApplyOpenCloseVisuals(instant)
         self.snowLayerFrame.Visible = self.isToggledOn and self._uiVisualSettings.Snow and self._overlayMode ~= "None"
     end
     if not self.isToggledOn or not self._uiVisualSettings.Snow or self._overlayMode == "None" then
+        self._overlayUpdateAccumulator = 0
         self._snowSpawnAccumulator = 0
         self:_ClearSnowflakes()
     end
@@ -1766,7 +1792,17 @@ function superMegaAwesomeLibrary:_UpdateESPPreview(dt)
     local resolvedDt = tonumber(dt) or 0
     if resolvedDt > 0 then
         self._espPreviewUpdateAccumulator = (tonumber(self._espPreviewUpdateAccumulator) or 0) + resolvedDt
-        if self._espPreviewUpdateAccumulator < 0.05 then
+        local updateInterval = isMobileUserSadly and 0.075 or 0.06
+        if self._latestFPSValue > 0 then
+            if self._latestFPSValue < 40 then
+                updateInterval = isMobileUserSadly and 0.11 or 0.09
+            elseif self._latestFPSValue < 55 then
+                updateInterval = isMobileUserSadly and 0.09 or 0.075
+            elseif self._latestFPSValue > 95 then
+                updateInterval = isMobileUserSadly and 0.065 or 0.05
+            end
+        end
+        if self._espPreviewUpdateAccumulator < updateInterval then
             return
         end
         resolvedDt = self._espPreviewUpdateAccumulator
@@ -1780,6 +1816,14 @@ function superMegaAwesomeLibrary:_UpdateESPPreview(dt)
     end
     local state = self._espPreviewState or self:_ResolveESPPreviewState()
     local previewColor = state.Color or self.config.AccentColor
+    local showMaster = state.Enabled ~= false
+    local needsProjection = showMaster and (
+        state.ShowBox == true
+        or state.ShowHealth == true
+        or state.ShowName == true
+        or state.ShowDot == true
+        or state.ShowTracers == true
+    )
 
     self:_EnsureESPPreviewCharacter()
     if self._espPreviewCharacter and self._espPreviewCharacter.Parent then
@@ -1855,7 +1899,10 @@ function superMegaAwesomeLibrary:_UpdateESPPreview(dt)
         return fallbackParts
     end
 
-    local projectParts = gatherProjectParts()
+    local projectParts = {}
+    if needsProjection then
+        projectParts = gatherProjectParts()
+    end
 
     local function getWorldBounds(parts)
         local minVec = Vector3.new(math.huge, math.huge, math.huge)
@@ -1891,7 +1938,7 @@ function superMegaAwesomeLibrary:_UpdateESPPreview(dt)
         return minVec, maxVec
     end
 
-    if viewportCamera and viewportSize.X > 2 and viewportSize.Y > 2 and #projectParts > 0 then
+    if needsProjection and viewportCamera and viewportSize.X > 2 and viewportSize.Y > 2 and #projectParts > 0 then
         viewportCamera.FieldOfView = 32
         local boundsMin, boundsMax = getWorldBounds(projectParts)
         if boundsMin and boundsMax then
@@ -1907,12 +1954,12 @@ function superMegaAwesomeLibrary:_UpdateESPPreview(dt)
             local lookTarget = boundsCenter + Vector3.new(0, math.clamp(boundsSize.Y * 0.03, -0.1, 0.45), 0)
             local cameraPos = lookTarget + Vector3.new(0, math.clamp(boundsSize.Y * 0.08, -0.2, 0.6), targetDepth)
             local targetCFrame = CFrame.new(cameraPos, lookTarget)
-            local lerpAlpha = math.clamp((dt or (1 / 60)) * 10, 0.12, 0.52)
+            local lerpAlpha = math.clamp((resolvedDt > 0 and resolvedDt or (1 / 60)) * 10, 0.12, 0.52)
             viewportCamera.CFrame = viewportCamera.CFrame:Lerp(targetCFrame, lerpAlpha)
         end
     end
 
-    if viewportCamera and viewportSize.X > 2 and viewportSize.Y > 2 then
+    if needsProjection and viewportCamera and viewportSize.X > 2 and viewportSize.Y > 2 then
         for _, part in ipairs(projectParts) do
             if part and part.Parent and part.Transparency < 0.985 then
                 local halfSize = part.Size * 0.5
@@ -1954,7 +2001,7 @@ function superMegaAwesomeLibrary:_UpdateESPPreview(dt)
         end
     end
 
-    if hasProjectedBox then
+    if needsProjection and hasProjectedBox then
         boxMinX = math.clamp(boxMinX, 0, viewportSize.X)
         boxMinY = math.clamp(boxMinY, 0, viewportSize.Y)
         boxMaxX = math.clamp(boxMaxX, 0, viewportSize.X)
@@ -1964,7 +2011,7 @@ function superMegaAwesomeLibrary:_UpdateESPPreview(dt)
         end
     end
 
-    if not hasProjectedBox and viewportSize.X > 2 and viewportSize.Y > 2 then
+    if needsProjection and not hasProjectedBox and viewportSize.X > 2 and viewportSize.Y > 2 then
         local fallbackWidth = viewportSize.X * 0.44
         local fallbackHeight = viewportSize.Y * 0.78
         boxMinX = (viewportSize.X - fallbackWidth) * 0.5
@@ -1979,8 +2026,6 @@ function superMegaAwesomeLibrary:_UpdateESPPreview(dt)
             rootScreenPos = Vector2.new((boxMinX + boxMaxX) * 0.5, boxMaxY)
         end
     end
-
-    local showMaster = state.Enabled ~= false
     if self._espPreviewBox then
         local showBox = showMaster and state.ShowBox == true and hasProjectedBox
         self._espPreviewBox.Visible = showBox
@@ -2061,28 +2106,39 @@ function superMegaAwesomeLibrary:_UpdateESPPreview(dt)
 
     for part, originalData in pairs(self._espPreviewPartDefaults) do
         if part and part.Parent and originalData then
-            if part.Name == "HumanoidRootPart" then
-                pcall(function()
-                    part.LocalTransparencyModifier = 1
-                end)
-            else
-                pcall(function()
-                    part.LocalTransparencyModifier = 0
-                end)
+            local isRootPart = part.Name == "HumanoidRootPart"
+            local targetLocalTransparency = isRootPart and 1 or 0
+            if part.LocalTransparencyModifier ~= targetLocalTransparency then
+                part.LocalTransparencyModifier = targetLocalTransparency
             end
-            if state.ShowChams == true and state.Enabled ~= false and part.Name ~= "HumanoidRootPart" then
-                part.Material = Enum.Material.ForceField
-                part.Color = previewColor
-                part.Transparency = math.clamp(state.ChamsTransparency or 0.55, 0, 0.92)
+            if state.ShowChams == true and showMaster and not isRootPart then
+                local targetChamsTransparency = math.clamp(state.ChamsTransparency or 0.55, 0, 0.92)
+                if part.Material ~= Enum.Material.ForceField then
+                    part.Material = Enum.Material.ForceField
+                end
+                if part.Color ~= previewColor then
+                    part.Color = previewColor
+                end
+                if math.abs(part.Transparency - targetChamsTransparency) > 0.001 then
+                    part.Transparency = targetChamsTransparency
+                end
             else
-                part.Material = originalData.Material
-                part.Color = originalData.Color
-                if part.Name == "HumanoidRootPart" then
-                    part.Transparency = 1
+                if part.Material ~= originalData.Material then
+                    part.Material = originalData.Material
+                end
+                if part.Color ~= originalData.Color then
+                    part.Color = originalData.Color
+                end
+                local targetTransparency
+                if isRootPart then
+                    targetTransparency = 1
                 elseif flowPreviewCoreBodyParts[part.Name] and (originalData.Transparency or 0) >= 0.98 then
-                    part.Transparency = 0
+                    targetTransparency = 0
                 else
-                    part.Transparency = originalData.Transparency
+                    targetTransparency = originalData.Transparency
+                end
+                if math.abs(part.Transparency - targetTransparency) > 0.001 then
+                    part.Transparency = targetTransparency
                 end
             end
         end
@@ -2318,13 +2374,22 @@ function superMegaAwesomeLibrary:CreateUIBecauseWeNeedIt()
     self:_TrackConnection(runServiceMoreLikeWalkService.RenderStepped:Connect(function(dt)
         if self._destroyed then return end
         
-        table.insert(self._fpsRollingWindow, dt)
-        self._fpsRollingTotal = self._fpsRollingTotal + dt
-        if #self._fpsRollingWindow > self._fpsRollingSize then
-            self._fpsRollingTotal = self._fpsRollingTotal - table.remove(self._fpsRollingWindow, 1)
+        local rollingIndex = self._fpsRollingIndex or 1
+        local previousDt = self._fpsRollingWindow[rollingIndex] or 0
+        if (self._fpsRollingCount or 0) >= self._fpsRollingSize then
+            self._fpsRollingTotal = self._fpsRollingTotal - previousDt
+        else
+            self._fpsRollingCount = (self._fpsRollingCount or 0) + 1
         end
-        if self._fpsRollingTotal > 0 then
-            self._latestFPSValue = math.clamp(math.floor((#self._fpsRollingWindow / self._fpsRollingTotal) + 0.5), 1, 360)
+        self._fpsRollingWindow[rollingIndex] = dt
+        self._fpsRollingTotal = self._fpsRollingTotal + dt
+        rollingIndex = rollingIndex + 1
+        if rollingIndex > self._fpsRollingSize then
+            rollingIndex = 1
+        end
+        self._fpsRollingIndex = rollingIndex
+        if self._fpsRollingTotal > 0 and (self._fpsRollingCount or 0) > 0 then
+            self._latestFPSValue = math.clamp(math.floor(((self._fpsRollingCount or 0) / self._fpsRollingTotal) + 0.5), 1, 360)
         end
         
         for scrollingFrame, state in pairs(self._smoothScrollFrames) do
@@ -2349,126 +2414,168 @@ function superMegaAwesomeLibrary:CreateUIBecauseWeNeedIt()
         self:_AnimateTextGradients(dt)
 
         if self._uiVisualSettings.BackgroundEffects and self.mainBackgroundEffectsFrame and self.mainBackgroundEffectsFrame.Visible then
-            self._backgroundFxTime = self._backgroundFxTime + dt
-            if self.mainBackgroundGradient then
-                self.mainBackgroundGradient.Rotation = (self.mainBackgroundGradient.Rotation + dt * 8) % 360
+            self._backgroundFxAccumulator = (self._backgroundFxAccumulator or 0) + dt
+            local backgroundStep = (self._latestFPSValue > 0 and self._latestFPSValue < 52) and (1 / 24) or (1 / 30)
+            if self._backgroundFxAccumulator >= backgroundStep then
+                local backgroundDt = self._backgroundFxAccumulator
+                self._backgroundFxAccumulator = 0
+                self._backgroundFxTime = self._backgroundFxTime + backgroundDt
+                if self.mainBackgroundGradient then
+                    self.mainBackgroundGradient.Rotation = (self.mainBackgroundGradient.Rotation + backgroundDt * 8) % 360
+                end
+                if self.mainBackgroundAccentGlow then
+                    local timeNow = self._backgroundFxTime
+                    local xPos = 0.5 + math.sin(timeNow * 0.45) * 0.09
+                    local yPos = 0.5 + math.cos(timeNow * 0.63) * 0.06
+                    self.mainBackgroundAccentGlow.Position = UDim2.new(xPos, 0, yPos, 0)
+                    self.mainBackgroundAccentGlow.ImageTransparency = 0.9 - (math.sin(timeNow * 1.6) + 1) * 0.03
+                end
             end
-            if self.mainBackgroundAccentGlow then
-                local timeNow = self._backgroundFxTime
-                local xPos = 0.5 + math.sin(timeNow * 0.45) * 0.09
-                local yPos = 0.5 + math.cos(timeNow * 0.63) * 0.06
-                self.mainBackgroundAccentGlow.Position = UDim2.new(xPos, 0, yPos, 0)
-                self.mainBackgroundAccentGlow.ImageTransparency = 0.9 - (math.sin(timeNow * 1.6) + 1) * 0.03
-            end
+        else
+            self._backgroundFxAccumulator = 0
         end
 
         if self.isToggledOn and self._uiVisualSettings.Snow and self.snowLayerFrame and self.snowLayerFrame.Visible and self._overlayMode ~= "None" then
-            self._snowSpawnAccumulator = self._snowSpawnAccumulator + dt
-            local overlayMode = self._overlayMode
-            local spawnInterval
-            local maxParticles
-            if overlayMode == "Rain" then
-                spawnInterval = isMobileUserSadly and 0.015 or 0.009
-                maxParticles = isMobileUserSadly and 88 or 170
-            elseif overlayMode == "Stars" then
-                spawnInterval = isMobileUserSadly and 0.03 or 0.018
-                maxParticles = isMobileUserSadly and 90 or 175
+            self._overlayUpdateAccumulator = (self._overlayUpdateAccumulator or 0) + dt
+            local overlayStep
+            if self._latestFPSValue > 0 and self._latestFPSValue < 40 then
+                overlayStep = isMobileUserSadly and (1 / 20) or (1 / 26)
+            elseif self._latestFPSValue > 0 and self._latestFPSValue < 55 then
+                overlayStep = isMobileUserSadly and (1 / 24) or (1 / 32)
             else
-                spawnInterval = isMobileUserSadly and 0.13 or 0.085
-                maxParticles = isMobileUserSadly and 38 or 72
+                overlayStep = isMobileUserSadly and (1 / 28) or (1 / 40)
             end
-            while self._snowSpawnAccumulator >= spawnInterval and #self._snowflakes < maxParticles do
+
+            if self._overlayUpdateAccumulator >= overlayStep then
+                local overlayDt = math.min(self._overlayUpdateAccumulator, 0.12)
+                self._overlayUpdateAccumulator = 0
+
+                self._snowSpawnAccumulator = self._snowSpawnAccumulator + overlayDt
+                local overlayMode = self._overlayMode
+                local spawnInterval
+                local maxParticles
                 if overlayMode == "Rain" then
-                    self:_SpawnRainDrop()
+                    spawnInterval = isMobileUserSadly and 0.015 or 0.009
+                    maxParticles = isMobileUserSadly and 88 or 170
                 elseif overlayMode == "Stars" then
-                    self:_SpawnStarParticle()
+                    spawnInterval = isMobileUserSadly and 0.03 or 0.018
+                    maxParticles = isMobileUserSadly and 90 or 175
                 else
-                    self:_SpawnSnowflake()
+                    spawnInterval = isMobileUserSadly and 0.13 or 0.085
+                    maxParticles = isMobileUserSadly and 38 or 72
                 end
-                self._snowSpawnAccumulator = self._snowSpawnAccumulator - spawnInterval
-            end
-            local nowTick = os.clock()
-            local viewportHeight = math.max(320, math.floor(self.screenGuiYay.AbsoluteSize.Y))
-            local viewportWidth = math.max(200, math.floor(self.screenGuiYay.AbsoluteSize.X))
-            for i = #self._snowflakes, 1, -1 do
-                local flakeData = self._snowflakes[i]
-                local flakeObj = flakeData and flakeData.instance
-                if not flakeObj or not flakeObj.Parent then
-                    table.remove(self._snowflakes, i)
-                else
-                    local overlayType = flakeData.overlayType or "Snow"
-                    if overlayType == "RainDrop" then
-                        flakeData.yOffset = flakeData.yOffset + flakeData.velocityY * dt
-                        flakeData.xOffset = flakeData.xOffset + flakeData.velocityX * dt
-                        local windOffset = math.sin(nowTick * flakeData.driftSpeed + flakeData.phase) * flakeData.windJitter
-                        local xPos = flakeData.xOffset + windOffset
-                        flakeObj.Position = UDim2.new(0, xPos, 0, flakeData.yOffset)
-                        local stretchPulse = 0.82 + math.sin(nowTick * flakeData.stretchPulse + flakeData.phase) * 0.18
-                        flakeObj.Size = UDim2.new(0, flakeData.width, 0, flakeData.length * stretchPulse)
-                        flakeObj.Rotation = flakeData.angle
-                        flakeObj.BackgroundTransparency = math.clamp(flakeData.baseTransparency + (math.sin(nowTick * 3.6 + flakeData.phase) * 0.07), 0.08, 0.9)
-                        if flakeData.yOffset > viewportHeight + 20 then
-                            if xPos > -40 and xPos < viewportWidth + 40 and math.random() < flakeData.splashChance then
-                                self:_SpawnRainSplash(xPos, viewportHeight - math.random(1, 8))
-                            end
-                            flakeObj:Destroy()
-                            table.remove(self._snowflakes, i)
-                        end
-                    elseif overlayType == "RainSplash" then
-                        flakeData.life = flakeData.life - dt
-                        if flakeData.life <= 0 then
-                            flakeObj:Destroy()
-                            table.remove(self._snowflakes, i)
-                        else
-                            local progress = 1 - (flakeData.life / flakeData.totalLife)
-                            local widthNow = flakeData.startSize + flakeData.endSize * progress
-                            local heightNow = math.max(1 * mobileScaleFactor, flakeData.startThickness * (1 - progress * 0.8))
-                            flakeObj.Size = UDim2.new(0, widthNow, 0, heightNow)
-                            flakeObj.Position = UDim2.new(0, flakeData.baseX + flakeData.driftX * progress, 0, flakeData.yOffset - progress * 1.2)
-                            flakeObj.BackgroundTransparency = math.clamp(flakeData.baseTransparency + progress * 0.55, 0.2, 0.97)
-                        end
-                    elseif overlayType == "Stars" then
-                        flakeData.xOffset = flakeData.xOffset + flakeData.velocityX * dt
-                        flakeData.yOffset = flakeData.yOffset + flakeData.velocityY * dt
-                        local driftX = math.sin(nowTick * flakeData.driftSpeed + flakeData.phase) * flakeData.driftAmount
-                        local driftY = math.cos(nowTick * (flakeData.driftSpeed * 0.72) + flakeData.phase) * flakeData.driftLift
-                        local xPos = flakeData.xOffset + driftX
-                        local yPos = flakeData.yOffset + driftY
-                        if xPos < -16 then
-                            flakeData.xOffset = viewportWidth + 16
-                            xPos = flakeData.xOffset
-                        elseif xPos > viewportWidth + 16 then
-                            flakeData.xOffset = -16
-                            xPos = flakeData.xOffset
-                        end
-                        if yPos < -16 then
-                            flakeData.yOffset = viewportHeight + 16
-                            yPos = flakeData.yOffset
-                        elseif yPos > viewportHeight + 16 then
-                            flakeData.yOffset = -16
-                            yPos = flakeData.yOffset
-                        end
-                        flakeObj.Position = UDim2.new(0, xPos, 0, yPos)
-                        local sparkle = (math.sin(nowTick * flakeData.twinkleSpeed + flakeData.phase) + 1) * 0.5
-                        local pulse = 1 + (math.sin(nowTick * (flakeData.twinkleSpeed * 0.75) + flakeData.phase) * flakeData.pulseAmount)
-                        local sizeNow = math.max(1 * mobileScaleFactor, flakeData.baseSize * (0.82 + pulse * 0.36))
-                        flakeObj.Size = UDim2.new(0, sizeNow, 0, sizeNow)
-                        flakeObj.ImageTransparency = math.clamp(flakeData.baseTransparency - sparkle * 0.5, 0.01, 0.92)
+
+                local performanceScale = 1
+                local currentFps = self._latestFPSValue
+                if currentFps > 0 then
+                    if currentFps < 35 then
+                        performanceScale = 0.55
+                    elseif currentFps < 45 then
+                        performanceScale = 0.7
+                    elseif currentFps < 58 then
+                        performanceScale = 0.82
+                    elseif currentFps > 120 then
+                        performanceScale = 1.08
+                    end
+                end
+                maxParticles = math.max(16, math.floor(maxParticles * performanceScale))
+
+                while self._snowSpawnAccumulator >= spawnInterval and #self._snowflakes < maxParticles do
+                    if overlayMode == "Rain" then
+                        self:_SpawnRainDrop()
+                    elseif overlayMode == "Stars" then
+                        self:_SpawnStarParticle()
                     else
-                        flakeData.yOffset = flakeData.yOffset + flakeData.fallSpeed * dt
-                        local driftX = math.sin(nowTick * flakeData.driftSpeed + flakeData.phase) * flakeData.driftAmount
-                        local swirlX = math.cos(nowTick * (flakeData.driftSpeed * 0.58) + flakeData.phase) * flakeData.swirlAmount
-                        flakeObj.Position = UDim2.new(0, flakeData.baseX + driftX + swirlX, 0, flakeData.yOffset)
-                        flakeObj.Rotation = (flakeObj.Rotation + flakeData.spin * dt) % 360
-                        local twinkle = (math.sin(nowTick * flakeData.twinkleSpeed + flakeData.phase) + 1) * 0.5
-                        flakeObj.ImageTransparency = math.clamp(flakeData.baseTransparency + twinkle * 0.22, 0.08, 0.84)
-                        if flakeData.yOffset > viewportHeight + 28 then
-                            flakeObj:Destroy()
-                            table.remove(self._snowflakes, i)
+                        self:_SpawnSnowflake()
+                    end
+                    self._snowSpawnAccumulator = self._snowSpawnAccumulator - spawnInterval
+                end
+
+                local nowTick = os.clock()
+                local viewportHeight = math.max(320, math.floor(self.screenGuiYay.AbsoluteSize.Y))
+                local viewportWidth = math.max(200, math.floor(self.screenGuiYay.AbsoluteSize.X))
+                for i = #self._snowflakes, 1, -1 do
+                    local flakeData = self._snowflakes[i]
+                    local flakeObj = flakeData and flakeData.instance
+                    if not flakeObj or not flakeObj.Parent then
+                        table.remove(self._snowflakes, i)
+                    else
+                        local overlayType = flakeData.overlayType or "Snow"
+                        if overlayType == "RainDrop" then
+                            flakeData.yOffset = flakeData.yOffset + flakeData.velocityY * overlayDt
+                            flakeData.xOffset = flakeData.xOffset + flakeData.velocityX * overlayDt
+                            local windOffset = math.sin(nowTick * flakeData.driftSpeed + flakeData.phase) * flakeData.windJitter
+                            local xPos = flakeData.xOffset + windOffset
+                            flakeObj.Position = UDim2.new(0, xPos, 0, flakeData.yOffset)
+                            local stretchPulse = 0.82 + math.sin(nowTick * flakeData.stretchPulse + flakeData.phase) * 0.18
+                            flakeObj.Size = UDim2.new(0, flakeData.width, 0, flakeData.length * stretchPulse)
+                            flakeObj.Rotation = flakeData.angle
+                            flakeObj.BackgroundTransparency = math.clamp(flakeData.baseTransparency + (math.sin(nowTick * 3.6 + flakeData.phase) * 0.07), 0.08, 0.9)
+                            if flakeData.yOffset > viewportHeight + 20 then
+                                if xPos > -40 and xPos < viewportWidth + 40 and math.random() < flakeData.splashChance then
+                                    self:_SpawnRainSplash(xPos, viewportHeight - math.random(1, 8))
+                                end
+                                flakeObj:Destroy()
+                                table.remove(self._snowflakes, i)
+                            end
+                        elseif overlayType == "RainSplash" then
+                            flakeData.life = flakeData.life - overlayDt
+                            if flakeData.life <= 0 then
+                                flakeObj:Destroy()
+                                table.remove(self._snowflakes, i)
+                            else
+                                local progress = 1 - (flakeData.life / flakeData.totalLife)
+                                local widthNow = flakeData.startSize + flakeData.endSize * progress
+                                local heightNow = math.max(1 * mobileScaleFactor, flakeData.startThickness * (1 - progress * 0.8))
+                                flakeObj.Size = UDim2.new(0, widthNow, 0, heightNow)
+                                flakeObj.Position = UDim2.new(0, flakeData.baseX + flakeData.driftX * progress, 0, flakeData.yOffset - progress * 1.2)
+                                flakeObj.BackgroundTransparency = math.clamp(flakeData.baseTransparency + progress * 0.55, 0.2, 0.97)
+                            end
+                        elseif overlayType == "Stars" then
+                            flakeData.xOffset = flakeData.xOffset + flakeData.velocityX * overlayDt
+                            flakeData.yOffset = flakeData.yOffset + flakeData.velocityY * overlayDt
+                            local driftX = math.sin(nowTick * flakeData.driftSpeed + flakeData.phase) * flakeData.driftAmount
+                            local driftY = math.cos(nowTick * (flakeData.driftSpeed * 0.72) + flakeData.phase) * flakeData.driftLift
+                            local xPos = flakeData.xOffset + driftX
+                            local yPos = flakeData.yOffset + driftY
+                            if xPos < -16 then
+                                flakeData.xOffset = viewportWidth + 16
+                                xPos = flakeData.xOffset
+                            elseif xPos > viewportWidth + 16 then
+                                flakeData.xOffset = -16
+                                xPos = flakeData.xOffset
+                            end
+                            if yPos < -16 then
+                                flakeData.yOffset = viewportHeight + 16
+                                yPos = flakeData.yOffset
+                            elseif yPos > viewportHeight + 16 then
+                                flakeData.yOffset = -16
+                                yPos = flakeData.yOffset
+                            end
+                            flakeObj.Position = UDim2.new(0, xPos, 0, yPos)
+                            local sparkle = (math.sin(nowTick * flakeData.twinkleSpeed + flakeData.phase) + 1) * 0.5
+                            local pulse = 1 + (math.sin(nowTick * (flakeData.twinkleSpeed * 0.75) + flakeData.phase) * flakeData.pulseAmount)
+                            local sizeNow = math.max(1 * mobileScaleFactor, flakeData.baseSize * (0.82 + pulse * 0.36))
+                            flakeObj.Size = UDim2.new(0, sizeNow, 0, sizeNow)
+                            flakeObj.ImageTransparency = math.clamp(flakeData.baseTransparency - sparkle * 0.5, 0.01, 0.92)
+                        else
+                            flakeData.yOffset = flakeData.yOffset + flakeData.fallSpeed * overlayDt
+                            local driftX = math.sin(nowTick * flakeData.driftSpeed + flakeData.phase) * flakeData.driftAmount
+                            local swirlX = math.cos(nowTick * (flakeData.driftSpeed * 0.58) + flakeData.phase) * flakeData.swirlAmount
+                            flakeObj.Position = UDim2.new(0, flakeData.baseX + driftX + swirlX, 0, flakeData.yOffset)
+                            flakeObj.Rotation = (flakeObj.Rotation + flakeData.spin * overlayDt) % 360
+                            local twinkle = (math.sin(nowTick * flakeData.twinkleSpeed + flakeData.phase) + 1) * 0.5
+                            flakeObj.ImageTransparency = math.clamp(flakeData.baseTransparency + twinkle * 0.22, 0.08, 0.84)
+                            if flakeData.yOffset > viewportHeight + 28 then
+                                flakeObj:Destroy()
+                                table.remove(self._snowflakes, i)
+                            end
                         end
                     end
                 end
             end
+        else
+            self._overlayUpdateAccumulator = 0
         end
     end))
 end
@@ -2935,8 +3042,7 @@ function superMegaAwesomeLibrary:CreateMainFrameYay()
         self:_SetTextGradientEnabled(enabled)
     end)
     local espPreviewToggleRef = createSettingsToggle("ESP Preview", self._uiVisualSettings.ESPSelfPreview, function(enabled)
-        self._uiVisualSettings.ESPSelfPreview = enabled
-        self:_UpdateESPPreview(0)
+        self:SetESPPreviewEnabled(enabled)
     end)
     self.uiSettingsToggleRefs = {blurToggleRef, overlayToggleRef, bgFxToggleRef, gradientToggleRef, espPreviewToggleRef}
 
@@ -5632,8 +5738,10 @@ function superMegaAwesomeLibrary:Destroy()
     self._trackedControls = {}
     self:_ClearSnowflakes()
     self:_DestroyESPPreviewCharacter()
-    self._fpsRollingWindow = {}
+    self._fpsRollingWindow = table.create and table.create(self._fpsRollingSize or 60, 0) or {}
     self._fpsRollingTotal = 0
+    self._fpsRollingIndex = 1
+    self._fpsRollingCount = 0
     self._latestFPSValue = 0
     self._espPreviewState = nil
     self._espPreviewProvider = nil
@@ -5650,6 +5758,11 @@ function superMegaAwesomeLibrary:Destroy()
     self._espPreviewRotateInput = nil
     self._espPreviewRotateLastX = nil
     self._textGradientAnimationTime = nil
+    self._gradientAnimationAccumulator = 0
+    self._backgroundFxAccumulator = 0
+    self._overlayUpdateAccumulator = 0
+    self._snowSpawnAccumulator = 0
+    self._gradientObjects = {}
 
     if self._blurEffectRef and self._blurEffectRef.Parent then
         self._blurEffectRef:Destroy()
