@@ -319,6 +319,7 @@ function superMegaAwesomeLibrary.new(config)
     self._espPreviewRotationYaw = math.rad(180)
     self._espPreviewRotationTargetYaw = math.rad(180)
     self._espPreviewStaticMode = true
+    self._espPreviewAllowManualRotation = true
     self._espPreviewPivotYOffset = -2
     self._espPreviewRotateCapture = nil
     self._espPreviewIsRotating = false
@@ -1169,7 +1170,8 @@ function superMegaAwesomeLibrary:_EnsureESPPreviewCharacter()
     end
     local pivotYOffset = self._espPreviewStaticMode and 0 or -math.clamp(previewExtents.Y * 0.43, 1.2, 3.2)
     self._espPreviewPivotYOffset = pivotYOffset
-    local initialYaw = self._espPreviewStaticMode and math.rad(180) or (tonumber(self._espPreviewRotationYaw) or tonumber(self._espPreviewRotationTargetYaw) or math.rad(180))
+    local allowPreviewRotate = self._espPreviewAllowManualRotation == true
+    local initialYaw = (self._espPreviewStaticMode and not allowPreviewRotate) and math.rad(180) or (tonumber(self._espPreviewRotationYaw) or tonumber(self._espPreviewRotationTargetYaw) or math.rad(180))
     self._espPreviewRotationYaw = initialYaw
     self._espPreviewRotationTargetYaw = initialYaw
     pcall(function()
@@ -1358,7 +1360,7 @@ function superMegaAwesomeLibrary:_CreateESPPreviewPanel()
         BackgroundTransparency = 1,
         Position = UDim2.new(0, 0, 0, 0),
         Size = UDim2.new(1, 0, 1, 0),
-        Active = not self._espPreviewStaticMode,
+        Active = self._espPreviewAllowManualRotation == true,
         Selectable = false,
         ZIndex = 35,
         Parent = viewport
@@ -1475,7 +1477,7 @@ function superMegaAwesomeLibrary:_CreateESPPreviewPanel()
     self._espPreviewCamera = camera
     self._espPreviewRotateCapture = rotateCapture
 
-    if not self._espPreviewStaticMode then
+    if self._espPreviewAllowManualRotation == true then
         local function stopESPPreviewRotate()
             self._espPreviewIsRotating = false
             self._espPreviewRotateInput = nil
@@ -1896,7 +1898,7 @@ function superMegaAwesomeLibrary:_UpdateESPPreview(dt)
     )
 
     self:_EnsureESPPreviewCharacter()
-    if not self._espPreviewStaticMode and self._espPreviewCharacter and self._espPreviewCharacter.Parent then
+    if self._espPreviewAllowManualRotation == true and self._espPreviewCharacter and self._espPreviewCharacter.Parent then
         local currentYaw = tonumber(self._espPreviewRotationYaw) or math.rad(180)
         local targetYaw = tonumber(self._espPreviewRotationTargetYaw) or currentYaw
         local yawDelta = math.atan2(math.sin(targetYaw - currentYaw), math.cos(targetYaw - currentYaw))
@@ -5822,6 +5824,7 @@ function superMegaAwesomeLibrary:Destroy()
     self._espPreviewAvatar3DImageUrl = nil
     self._espPreviewRotationYaw = nil
     self._espPreviewRotationTargetYaw = nil
+    self._espPreviewAllowManualRotation = nil
     self._espPreviewPivotYOffset = nil
     self._espPreviewRotateCapture = nil
     self._espPreviewIsRotating = false
