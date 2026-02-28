@@ -18,6 +18,11 @@ local mouseGoClickClick = theOneAndOnlyPlayer:GetMouse()
 
 local isMobileUserSadly = thisInputServiceGoesHard.TouchEnabled and not thisInputServiceGoesHard.KeyboardEnabled
 local mobileScaleFactor = isMobileUserSadly and 0.7 or 1
+local FLOW_SCROLL_SPEED_DEFAULT = isMobileUserSadly and 46 or 68
+local FLOW_SCROLL_SPEED_SECTION = isMobileUserSadly and 42 or 58
+local FLOW_SCROLL_SPEED_CONTENT = isMobileUserSadly and 56 or 78
+local FLOW_SCROLL_ALPHA_MIN = isMobileUserSadly and 0.2 or 0.24
+local FLOW_SCROLL_SENSITIVITY = isMobileUserSadly and 1.5 or 2.15
 
 local function makeThingExist(className, properties)
     local whatWeJustMade = Instance.new(className)
@@ -259,7 +264,7 @@ function superMegaAwesomeLibrary.new(config)
     self._snowflakes = {}
     self._snowSpawnAccumulator = 0
     self._snowMaxFlakes = isMobileUserSadly and 45 or 90
-    self._overlayMode = "Snow"
+    self._overlayMode = "None"
     self._overlayModes = {"Snow", "Rain", "Stars", "None"}
     self._backgroundFxTime = 0
     self._backgroundFxAccumulator = 0
@@ -268,10 +273,10 @@ function superMegaAwesomeLibrary.new(config)
     self._overlayUpdateAccumulator = 0
     self._uiVisualSettings = {
         Blur = true,
-        Snow = true,
-        BackgroundEffects = true,
+        Snow = false,
+        BackgroundEffects = false,
         TextGradient = true,
-        ESPSelfPreview = true
+        ESPSelfPreview = false
     }
     self._fontPresets = {
         {Name = "Gotham", EnumFont = Enum.Font.Gotham, Family = "rbxasset://fonts/families/GothamSSm.json", Weight = Enum.FontWeight.SemiBold},
@@ -2227,6 +2232,10 @@ end
 
 function superMegaAwesomeLibrary:EnableSmoothScrolling(scrollFrame, smoothSpeed)
     if not scrollFrame or self._smoothScrollFrames[scrollFrame] then return end
+    local resolvedSpeed = math.max(tonumber(smoothSpeed) or FLOW_SCROLL_SPEED_DEFAULT, 1)
+    pcall(function()
+        scrollFrame.ScrollingSensitivity = math.max(tonumber(scrollFrame.ScrollingSensitivity) or 1, FLOW_SCROLL_SENSITIVITY)
+    end)
     if scrollFrame:GetAttribute("FlowDisableSmoothScroll") == true then
         scrollFrame.ScrollingDirection = Enum.ScrollingDirection.Y
         scrollFrame.ElasticBehavior = Enum.ElasticBehavior.Never
@@ -2236,7 +2245,7 @@ function superMegaAwesomeLibrary:EnableSmoothScrolling(scrollFrame, smoothSpeed)
     self._smoothScrollFrames[scrollFrame] = {
         targetY = scrollFrame.CanvasPosition.Y,
         internal = false,
-        speed = smoothSpeed or 34
+        speed = resolvedSpeed
     }
     scrollFrame.ScrollingDirection = Enum.ScrollingDirection.Y
     scrollFrame.ElasticBehavior = Enum.ElasticBehavior.WhenScrollable
@@ -2467,6 +2476,11 @@ function superMegaAwesomeLibrary:CreateUIBecauseWeNeedIt()
         for scrollingFrame, state in pairs(self._smoothScrollFrames) do
             if not scrollingFrame or not scrollingFrame.Parent then
                 self._smoothScrollFrames[scrollingFrame] = nil
+            elseif not scrollingFrame.Visible then
+                state.targetY = scrollingFrame.CanvasPosition.Y
+                if state.internal then
+                    state.internal = false
+                end
             else
                 local currentY = scrollingFrame.CanvasPosition.Y
                 local goalY = state.targetY
@@ -2474,7 +2488,7 @@ function superMegaAwesomeLibrary:CreateUIBecauseWeNeedIt()
                 if math.abs(diff) > 0.05 then
                     state.internal = true
                     local frameDt = math.clamp(tonumber(dt) or (1 / 60), 1 / 240, 1 / 20)
-                    local alpha = math.clamp(1 - math.exp(-(state.speed or 34) * frameDt), 0.16, 1)
+                    local alpha = math.clamp(1 - math.exp(-(state.speed or FLOW_SCROLL_SPEED_DEFAULT) * frameDt), FLOW_SCROLL_ALPHA_MIN, 1)
                     scrollingFrame.CanvasPosition = Vector2.new(scrollingFrame.CanvasPosition.X, currentY + diff * alpha)
                     state.internal = false
                 elseif state.internal then
@@ -2955,7 +2969,7 @@ function superMegaAwesomeLibrary:CreateMainFrameYay()
     
     makeThingExist("UIPadding", {PaddingLeft = UDim.new(0, 2), PaddingRight = UDim.new(0, 2), PaddingTop = UDim.new(0, 2), Parent = self.sectionHolderScroll})
     self.sectionLayoutThing = makeThingExist("UIListLayout", {Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder, Parent = self.sectionHolderScroll})
-    self:EnableSmoothScrolling(self.sectionHolderScroll, 34)
+    self:EnableSmoothScrolling(self.sectionHolderScroll, FLOW_SCROLL_SPEED_SECTION)
     
     self.contentHolderFrame = makeThingExist("Frame", {
         BackgroundTransparency = 1, Position = UDim2.new(0, 198 * mobileScaleFactor, 0, 62 * mobileScaleFactor),
@@ -3796,7 +3810,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
             CanvasSize = UDim2.new(0, 540 * mobileScaleFactor, 0, 0), Visible = false,
             Parent = sectionObj.Library.contentHolderFrame
         })
-        sectionObj.Library:EnableSmoothScrolling(tabObj.contentScroll, 38)
+        sectionObj.Library:EnableSmoothScrolling(tabObj.contentScroll, FLOW_SCROLL_SPEED_CONTENT)
         
         tabObj.leftColumnFrame = makeThingExist("Frame", {BackgroundTransparency = 1, Size = UDim2.new(0, 262 * mobileScaleFactor, 0, 1000), Parent = tabObj.contentScroll})
         tabObj.rightColumnFrame = makeThingExist("Frame", {BackgroundTransparency = 1, Position = UDim2.new(0, 272 * mobileScaleFactor, 0, 0), Size = UDim2.new(0, 262 * mobileScaleFactor, 0, 1000), Parent = tabObj.contentScroll})
