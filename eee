@@ -2236,7 +2236,7 @@ function superMegaAwesomeLibrary:EnableSmoothScrolling(scrollFrame, smoothSpeed)
     self._smoothScrollFrames[scrollFrame] = {
         targetY = scrollFrame.CanvasPosition.Y,
         internal = false,
-        speed = smoothSpeed or 18
+        speed = smoothSpeed or 34
     }
     scrollFrame.ScrollingDirection = Enum.ScrollingDirection.Y
     scrollFrame.ElasticBehavior = Enum.ElasticBehavior.WhenScrollable
@@ -2473,7 +2473,8 @@ function superMegaAwesomeLibrary:CreateUIBecauseWeNeedIt()
                 local diff = goalY - currentY
                 if math.abs(diff) > 0.05 then
                     state.internal = true
-                    local alpha = math.clamp(dt * state.speed, 0, 1)
+                    local frameDt = math.clamp(tonumber(dt) or (1 / 60), 1 / 240, 1 / 20)
+                    local alpha = math.clamp(1 - math.exp(-(state.speed or 34) * frameDt), 0.16, 1)
                     scrollingFrame.CanvasPosition = Vector2.new(scrollingFrame.CanvasPosition.X, currentY + diff * alpha)
                     state.internal = false
                 elseif state.internal then
@@ -2954,7 +2955,7 @@ function superMegaAwesomeLibrary:CreateMainFrameYay()
     
     makeThingExist("UIPadding", {PaddingLeft = UDim.new(0, 2), PaddingRight = UDim.new(0, 2), PaddingTop = UDim.new(0, 2), Parent = self.sectionHolderScroll})
     self.sectionLayoutThing = makeThingExist("UIListLayout", {Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder, Parent = self.sectionHolderScroll})
-    self:EnableSmoothScrolling(self.sectionHolderScroll, 16)
+    self:EnableSmoothScrolling(self.sectionHolderScroll, 34)
     
     self.contentHolderFrame = makeThingExist("Frame", {
         BackgroundTransparency = 1, Position = UDim2.new(0, 198 * mobileScaleFactor, 0, 62 * mobileScaleFactor),
@@ -3795,7 +3796,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
             CanvasSize = UDim2.new(0, 540 * mobileScaleFactor, 0, 0), Visible = false,
             Parent = sectionObj.Library.contentHolderFrame
         })
-        sectionObj.Library:EnableSmoothScrolling(tabObj.contentScroll, 18)
+        sectionObj.Library:EnableSmoothScrolling(tabObj.contentScroll, 38)
         
         tabObj.leftColumnFrame = makeThingExist("Frame", {BackgroundTransparency = 1, Size = UDim2.new(0, 262 * mobileScaleFactor, 0, 1000), Parent = tabObj.contentScroll})
         tabObj.rightColumnFrame = makeThingExist("Frame", {BackgroundTransparency = 1, Position = UDim2.new(0, 272 * mobileScaleFactor, 0, 0), Size = UDim2.new(0, 262 * mobileScaleFactor, 0, 1000), Parent = tabObj.contentScroll})
