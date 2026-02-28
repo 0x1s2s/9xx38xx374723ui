@@ -262,11 +262,11 @@ function superMegaAwesomeLibrary.new(config)
     self._backgroundFxTime = 0
     self._textGradientAnimationTime = 0
     self._uiVisualSettings = {
-        Blur = true,
-        Snow = true,
-        BackgroundEffects = true,
-        TextGradient = true,
-        ESPSelfPreview = true
+        Blur = false,
+        Snow = false,
+        BackgroundEffects = false,
+        TextGradient = false,
+        ESPSelfPreview = false
     }
     self._fontPresets = {
         {Name = "Gotham", EnumFont = Enum.Font.Gotham, Family = "rbxasset://fonts/families/GothamSSm.json", Weight = Enum.FontWeight.SemiBold},
@@ -286,6 +286,8 @@ function superMegaAwesomeLibrary.new(config)
     self._espPreviewData = nil
     self._espPreviewState = nil
     self._espPreviewResolveAccumulator = 0
+    self._espPreviewUpdateAccumulator = 0
+    self._espPreviewWasShowing = false
     self._espPreviewPanel = nil
     self._espPreviewViewport = nil
     self._espPreviewWorldModel = nil
@@ -808,6 +810,11 @@ end
 
 function superMegaAwesomeLibrary:SetESPPreviewEnabled(enabled)
     self._uiVisualSettings.ESPSelfPreview = enabled == true
+    if not self._uiVisualSettings.ESPSelfPreview then
+        self._espPreviewWasShowing = false
+        self._espPreviewUpdateAccumulator = 0
+        self:_DestroyESPPreviewCharacter()
+    end
     self:_UpdateESPPreview(0)
 end
 
@@ -1733,20 +1740,40 @@ function superMegaAwesomeLibrary:_ResolveESPPreviewState()
 end
 
 function superMegaAwesomeLibrary:_UpdateESPPreview(dt)
+    local shouldShow = self.isToggledOn and self._uiVisualSettings.ESPSelfPreview
+    if not shouldShow then
+        if self._espPreviewPanel then
+            self._espPreviewPanel.Visible = false
+        end
+        if self._espPreviewWasShowing then
+            self._espPreviewWasShowing = false
+            self._espPreviewUpdateAccumulator = 0
+            self:_DestroyESPPreviewCharacter()
+        end
+        return
+    end
+
+    self._espPreviewWasShowing = true
+
     if not self._espPreviewPanel or not self._espPreviewPanel.Parent then
         self:_CreateESPPreviewPanel()
     end
     if not self._espPreviewPanel then
         return
     end
+    self._espPreviewPanel.Visible = true
 
-    local shouldShow = self.isToggledOn and self._uiVisualSettings.ESPSelfPreview
-    self._espPreviewPanel.Visible = shouldShow
-    if not shouldShow then
-        return
+    local resolvedDt = tonumber(dt) or 0
+    if resolvedDt > 0 then
+        self._espPreviewUpdateAccumulator = (tonumber(self._espPreviewUpdateAccumulator) or 0) + resolvedDt
+        if self._espPreviewUpdateAccumulator < 0.05 then
+            return
+        end
+        resolvedDt = self._espPreviewUpdateAccumulator
+        self._espPreviewUpdateAccumulator = 0
     end
 
-    self._espPreviewResolveAccumulator = self._espPreviewResolveAccumulator + (dt or 0)
+    self._espPreviewResolveAccumulator = self._espPreviewResolveAccumulator + resolvedDt
     if not self._espPreviewState or self._espPreviewResolveAccumulator >= 0.16 then
         self._espPreviewState = self:_ResolveESPPreviewState()
         self._espPreviewResolveAccumulator = 0
@@ -1759,7 +1786,7 @@ function superMegaAwesomeLibrary:_UpdateESPPreview(dt)
         local currentYaw = tonumber(self._espPreviewRotationYaw) or math.rad(180)
         local targetYaw = tonumber(self._espPreviewRotationTargetYaw) or currentYaw
         local yawDelta = math.atan2(math.sin(targetYaw - currentYaw), math.cos(targetYaw - currentYaw))
-        local yawAlpha = math.clamp((dt or (1 / 60)) * 14, 0.08, 0.58)
+        local yawAlpha = math.clamp((resolvedDt > 0 and resolvedDt or (1 / 60)) * 14, 0.08, 0.58)
         if math.abs(yawDelta) > 0.0004 then
             currentYaw = currentYaw + yawDelta * yawAlpha
             self._espPreviewRotationYaw = currentYaw
@@ -2072,6 +2099,12 @@ end
 
 function superMegaAwesomeLibrary:EnableSmoothScrolling(scrollFrame, smoothSpeed)
     if not scrollFrame or self._smoothScrollFrames[scrollFrame] then return end
+    if scrollFrame:GetAttribute("FlowDisableSmoothScroll") == true then
+        scrollFrame.ScrollingDirection = Enum.ScrollingDirection.Y
+        scrollFrame.ElasticBehavior = Enum.ElasticBehavior.Never
+        scrollFrame.ScrollBarImageTransparency = 0.1
+        return
+    end
     self._smoothScrollFrames[scrollFrame] = {
         targetY = scrollFrame.CanvasPosition.Y,
         internal = false,
@@ -2153,18 +2186,13 @@ function superMegaAwesomeLibrary:ApplySearchFilter(rawQuery)
 end
 
 function superMegaAwesomeLibrary:SaveConfig(fileName)
-    if not writefile or not isfolder or not makefolder then
-        return false, "writefile/makefolder APIs are unavailable in this executor."
+    if not writefile or not isfolder then
+        return false, "writefile/isfolder APIs are unavailable in this executor."
     end
     
     local folder = "FlowUIConfigs"
     if not isfolder(folder) then
-        local okMake, errMake = pcall(function()
-            makefolder(folder)
-        end)
-        if not okMake then
-            return false, "Failed to create config folder: " .. tostring(errMake)
-        end
+        return false, "Config folder not found: " .. folder
     end
     
     local configName = sanitizeConfigName(fileName)
@@ -2181,9 +2209,10 @@ function superMegaAwesomeLibrary:SaveConfig(fileName)
         end
     end
     
+    local path = folder .. "/" .. configName .. ".json"
     local encoded = httpServiceNoCap:JSONEncode(payload)
     local okWrite, errWrite = pcall(function()
-        writefile(folder .. "/" .. configName .. ".json", encoded)
+        writefile(path, encoded)
     end)
     if not okWrite then
         return false, "Failed to write config file: " .. tostring(errWrite)
@@ -2268,7 +2297,9 @@ function superMegaAwesomeLibrary:CreateUIBecauseWeNeedIt()
     
     self:CreateWatermarkBecauseWeCool()
     self:CreateMainFrameYay()
-    self:_CreateESPPreviewPanel()
+    if self._uiVisualSettings.ESPSelfPreview then
+        self:_CreateESPPreviewPanel()
+    end
     self:CreateNotificationHolderForCoolNotifs()
     self:CreateMobileToggleButton()
     self:ApplyFontPreset(self._fontPresetIndex)
@@ -4577,6 +4608,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     ScrollBarImageColor3 = Color3.fromRGB(80, 80, 80), CanvasSize = UDim2.new(0, 0, 0, 0),
                     ZIndex = 10000, Parent = dropdownObj.optionHolderFrame
                 })
+                dropdownObj.optionScrollFrame:SetAttribute("FlowDisableSmoothScroll", true)
                 groupObj.Library:EnableSmoothScrolling(dropdownObj.optionScrollFrame, 22)
                 
                 dropdownObj.optionContainerFrame = makeThingExist("Frame", {
@@ -4853,6 +4885,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     ScrollBarImageColor3 = Color3.fromRGB(80, 80, 80), CanvasSize = UDim2.new(0, 0, 0, 0),
                     ZIndex = 10000, Parent = multiDropdownObj.optionHolderFrame
                 })
+                multiDropdownObj.optionScrollFrame:SetAttribute("FlowDisableSmoothScroll", true)
                 groupObj.Library:EnableSmoothScrolling(multiDropdownObj.optionScrollFrame, 22)
                 
                 multiDropdownObj.optionContainerFrame = makeThingExist("Frame", {
