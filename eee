@@ -271,7 +271,8 @@ function superMegaAwesomeLibrary.new(config)
         Snow = true,
         BackgroundEffects = true,
         TextGradient = true,
-        ESPSelfPreview = true
+        ESPSelfPreview = true,
+        HideName = false
     }
     self._fontPresets = {
         {Name = "Gotham", EnumFont = Enum.Font.Gotham, Family = "rbxasset://fonts/families/GothamSSm.json", Weight = Enum.FontWeight.SemiBold},
@@ -588,6 +589,29 @@ function superMegaAwesomeLibrary:_SetBackgroundEffectsEnabled(enabled)
     end
     if self.mainBackgroundEffectsFrame then
         self.mainBackgroundEffectsFrame.Visible = self._uiVisualSettings.BackgroundEffects
+    end
+end
+
+function superMegaAwesomeLibrary:_SetNameHidden(enabled)
+    self._uiVisualSettings.HideName = enabled == true
+    local hideName = self._uiVisualSettings.HideName == true
+
+    if self.userNameLabel then
+        self.userNameLabel.Visible = not hideName
+        if not hideName then
+            self.userNameLabel.Text = "@" .. tostring(theOneAndOnlyPlayer.Name)
+        end
+    end
+
+    if self._espPreviewHeaderTag then
+        self._espPreviewHeaderTag.Visible = not hideName
+        if not hideName then
+            self._espPreviewHeaderTag.Text = "@" .. tostring(theOneAndOnlyPlayer.Name)
+        end
+    end
+
+    if self._espPreviewPanel then
+        self:_UpdateESPPreview(0)
     end
 end
 
@@ -1889,6 +1913,7 @@ function superMegaAwesomeLibrary:_UpdateESPPreview(dt)
     local state = self._espPreviewState or self:_ResolveESPPreviewState()
     local previewColor = state.Color or self.config.AccentColor
     local showMaster = state.Enabled ~= false
+    local hidePlayerName = self._uiVisualSettings.HideName == true
     local needsProjection = showMaster and (
         state.ShowBox == true
         or state.ShowHealth == true
@@ -1916,7 +1941,10 @@ function superMegaAwesomeLibrary:_UpdateESPPreview(dt)
         self:_StartESPPreviewWalkAnimation(theOneAndOnlyPlayer.Character)
     end
     if self._espPreviewHeaderTag then
-        self._espPreviewHeaderTag.Text = "@" .. tostring(theOneAndOnlyPlayer.Name)
+        self._espPreviewHeaderTag.Visible = not hidePlayerName
+        if not hidePlayerName then
+            self._espPreviewHeaderTag.Text = "@" .. tostring(theOneAndOnlyPlayer.Name)
+        end
     end
     if not self._espPreviewCharacter then
         if self._espPreviewBox then self._espPreviewBox.Visible = false end
@@ -2137,9 +2165,11 @@ function superMegaAwesomeLibrary:_UpdateESPPreview(dt)
     end
 
     if self._espPreviewName then
-        local showName = showMaster and state.ShowName == true and (hasProjectedBox or headScreenPos ~= nil)
+        local showName = not hidePlayerName and showMaster and state.ShowName == true and (hasProjectedBox or headScreenPos ~= nil)
         self._espPreviewName.Visible = showName
-        self._espPreviewName.Text = tostring(state.Name or theOneAndOnlyPlayer.Name)
+        if not hidePlayerName then
+            self._espPreviewName.Text = tostring(state.Name or theOneAndOnlyPlayer.Name)
+        end
         self._espPreviewName.TextColor3 = previewColor
         if showName then
             local nameWidth = hasProjectedBox and (boxMaxX - boxMinX + 20 * mobileScaleFactor) or (120 * mobileScaleFactor)
@@ -2881,6 +2911,7 @@ function superMegaAwesomeLibrary:CreateMainFrameYay()
         TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd,
         Parent = self.mainFrameYay
     })
+    self:_SetNameHidden(self._uiVisualSettings.HideName)
     
     self.playerAvatarImg = makeThingExist("ImageLabel", {
         Image = getPlayerAvatarCuzTheyreBeautiful(theOneAndOnlyPlayer.UserId), BackgroundTransparency = 1,
@@ -2964,7 +2995,7 @@ function superMegaAwesomeLibrary:CreateMainFrameYay()
     })
 
     local settingsPanelWidth = 185 * mobileScaleFactor
-    local settingsPanelHeight = 244 * mobileScaleFactor
+    local settingsPanelHeight = 268 * mobileScaleFactor
     self.uiSettingsOpen = false
 
     self.uiSettingsButtonFrame = makeThingExist("Frame", {
@@ -3117,7 +3148,10 @@ function superMegaAwesomeLibrary:CreateMainFrameYay()
     local espPreviewToggleRef = createSettingsToggle("ESP Preview", self._uiVisualSettings.ESPSelfPreview, function(enabled)
         self:SetESPPreviewEnabled(enabled)
     end)
-    self.uiSettingsToggleRefs = {blurToggleRef, overlayToggleRef, bgFxToggleRef, gradientToggleRef, espPreviewToggleRef}
+    local hideNameToggleRef = createSettingsToggle("Hide Name", self._uiVisualSettings.HideName, function(enabled)
+        self:_SetNameHidden(enabled)
+    end)
+    self.uiSettingsToggleRefs = {blurToggleRef, overlayToggleRef, bgFxToggleRef, gradientToggleRef, espPreviewToggleRef, hideNameToggleRef}
 
     local overlayRow = makeThingExist("Frame", {
         BackgroundTransparency = 1,
