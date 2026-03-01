@@ -183,6 +183,37 @@ local function normalizeSearchText(text)
     return string.lower(tostring(text or "")):gsub("^%s+", ""):gsub("%s+$", "")
 end
 
+local function normalizeDropdownOptions(options)
+    local normalized = {}
+    if type(options) == "table" then
+        for _, option in ipairs(options) do
+            if option ~= nil then
+                table.insert(normalized, option)
+            end
+        end
+    end
+    if #normalized == 0 then
+        normalized[1] = "None"
+    end
+    return normalized
+end
+
+local function getDropdownOptionsSignature(options)
+    if type(options) ~= "table" then
+        return "0"
+    end
+    local count = #options
+    if count <= 0 then
+        return "0"
+    end
+    local signaturePieces = table.create and table.create(count + 1, "") or {}
+    signaturePieces[1] = tostring(count)
+    for index, option in ipairs(options) do
+        signaturePieces[index + 1] = tostring(option)
+    end
+    return table.concat(signaturePieces, "\31")
+end
+
 local function serializeConfigValue(value)
     local valueType = typeof(value)
     if valueType == "Color3" then
@@ -259,7 +290,7 @@ function superMegaAwesomeLibrary.new(config)
     self._snowflakes = {}
     self._snowSpawnAccumulator = 0
     self._snowMaxFlakes = isMobileUserSadly and 45 or 90
-    self._overlayMode = "Snow"
+    self._overlayMode = "None"
     self._overlayModes = {"Snow", "Rain", "Stars", "None"}
     self._backgroundFxTime = 0
     self._backgroundFxAccumulator = 0
@@ -267,11 +298,11 @@ function superMegaAwesomeLibrary.new(config)
     self._gradientAnimationAccumulator = 0
     self._overlayUpdateAccumulator = 0
     self._uiVisualSettings = {
-        Blur = true,
-        Snow = true,
-        BackgroundEffects = true,
-        TextGradient = true,
-        ESPSelfPreview = true,
+        Blur = false,
+        Snow = false,
+        BackgroundEffects = false,
+        TextGradient = false,
+        ESPSelfPreview = false,
         HideName = false
     }
     self._fontPresets = {
@@ -4744,17 +4775,35 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 dropdownConfig = dropdownConfig or {}
                 dropdownConfig.Name = dropdownConfig.Name or "Dropdown"
                 dropdownConfig.Options = dropdownConfig.Options or {"Option 1", "Option 2", "Option 3"}
-                dropdownConfig.Default = dropdownConfig.Default or dropdownConfig.Options[1]
+                dropdownConfig.OptionsProvider = dropdownConfig.OptionsProvider or dropdownConfig.GetOptions
+                dropdownConfig.AutoRefresh = dropdownConfig.AutoRefresh ~= false
+                dropdownConfig.RefreshInterval = math.max(tonumber(dropdownConfig.RefreshInterval) or 0.85, 0.35)
                 dropdownConfig.Callback = dropdownConfig.Callback or function() end
                 dropdownConfig.Flag = dropdownConfig.Flag or createAutoFlag(dropdownConfig.Name)
+                local dropdownOptionsSource = dropdownConfig.Options
+                if type(dropdownConfig.OptionsProvider) == "function" then
+                    local ok, providedOptions = pcall(dropdownConfig.OptionsProvider)
+                    if ok and type(providedOptions) == "table" then
+                        dropdownOptionsSource = providedOptions
+                    end
+                end
+                dropdownConfig.Options = normalizeDropdownOptions(dropdownOptionsSource)
+                dropdownConfig.Default = dropdownConfig.Default or dropdownConfig.Options[1] or "None"
+                if not table.find(dropdownConfig.Options, dropdownConfig.Default) then
+                    dropdownConfig.Default = dropdownConfig.Options[1] or "None"
+                end
                 addSearchTerm(dropdownConfig.Name)
                 for _, option in ipairs(dropdownConfig.Options) do
-                    addSearchTerm(option)
+                    addSearchTerm(tostring(option))
                 end
                 
                 local dropdownObj = {}
                 dropdownObj.value = dropdownConfig.Default
                 dropdownObj.isOpen = false
+                dropdownObj._optionsSignature = getDropdownOptionsSignature(dropdownOptionsSource)
+                if dropdownObj._optionsSignature == "0" then
+                    dropdownObj._optionsSignature = getDropdownOptionsSignature(dropdownConfig.Options)
+                end
                 local yPosition = groupObj.elementYPos
                 
                 dropdownObj.labelText = makeThingExist("TextLabel", {
@@ -4765,7 +4814,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd, Parent = groupObj.mainFrame
                 })
                 
-                local displayText = dropdownObj.value or "None"
+                local displayText = tostring(dropdownObj.value or "None")
                 local buttonWidth = math.max(70 * mobileScaleFactor, howWideIsThisText(displayText, 12 * mobileScaleFactor) + 30 * mobileScaleFactor)
                 
                 dropdownObj.buttonFrame = makeThingExist("Frame", {
@@ -4877,7 +4926,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                         local optionLabelText = makeThingExist("TextLabel", {
                             FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
                             TextColor3 = isSelected and groupObj.Library.config.AccentColor or Color3.fromRGB(124, 124, 124),
-                            Text = option, BackgroundTransparency = 1, Position = UDim2.new(0, 12, 0, optY),
+                            Text = tostring(option), BackgroundTransparency = 1, Position = UDim2.new(0, 12, 0, optY),
                             TextSize = 14 * mobileScaleFactor, Size = UDim2.new(1, -24, 0, 18 * mobileScaleFactor),
                             TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd,
                             ZIndex = 10001, Parent = dropdownObj.optionContainerFrame
@@ -4889,8 +4938,9 @@ function superMegaAwesomeLibrary:CreateSection(config)
                         optionClickButton.MouseButton1Click:Connect(function()
                             dropdownObj.value = option
                             closeDropdown(false)
-                            dropdownObj.selectedLabelText.Text = option
-                            local newWidth = math.max(70 * mobileScaleFactor, howWideIsThisText(option, 12 * mobileScaleFactor) + 30 * mobileScaleFactor)
+                            local optionText = tostring(option)
+                            dropdownObj.selectedLabelText.Text = optionText
+                            local newWidth = math.max(70 * mobileScaleFactor, howWideIsThisText(optionText, 12 * mobileScaleFactor) + 30 * mobileScaleFactor)
                             smoothMoveGoWoosh(dropdownObj.buttonFrame, {Size = UDim2.new(0, newWidth, 0, 21 * mobileScaleFactor), Position = UDim2.new(1, -newWidth - 10, 0, yPosition)}, 0.15)
                             createOptionsYay()
                             dropdownConfig.Callback(option)
@@ -4949,10 +4999,10 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 
                 function dropdownObj:Set(value)
                     if value == nil then return end
-                    value = tostring(value)
                     dropdownObj.value = value
-                    dropdownObj.selectedLabelText.Text = value
-                    local newWidth = math.max(70 * mobileScaleFactor, howWideIsThisText(value, 12 * mobileScaleFactor) + 30 * mobileScaleFactor)
+                    local displayValue = tostring(value)
+                    dropdownObj.selectedLabelText.Text = displayValue
+                    local newWidth = math.max(70 * mobileScaleFactor, howWideIsThisText(displayValue, 12 * mobileScaleFactor) + 30 * mobileScaleFactor)
                     dropdownObj.buttonFrame.Size = UDim2.new(0, newWidth, 0, 21 * mobileScaleFactor)
                     dropdownObj.buttonFrame.Position = UDim2.new(1, -newWidth - 10, 0, yPosition)
                     createOptionsYay()
@@ -4964,14 +5014,46 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 end
                 
                 function dropdownObj:UpdateOptions(newOptions)
-                    dropdownConfig.Options = newOptions
-                    for _, option in ipairs(dropdownConfig.Options) do
-                        addSearchTerm(option)
+                    if type(newOptions) ~= "table" then
+                        return
                     end
+                    dropdownOptionsSource = newOptions
+                    dropdownObj._optionsSignature = getDropdownOptionsSignature(newOptions)
+                    dropdownConfig.Options = normalizeDropdownOptions(newOptions)
+                    for _, option in ipairs(dropdownConfig.Options) do
+                        addSearchTerm(tostring(option))
+                    end
+                    if not table.find(dropdownConfig.Options, dropdownObj.value) then
+                        dropdownObj.value = dropdownConfig.Options[1] or "None"
+                    end
+                    local displayValue = tostring(dropdownObj.value or "None")
+                    dropdownObj.selectedLabelText.Text = displayValue
+                    local newWidth = math.max(70 * mobileScaleFactor, howWideIsThisText(displayValue, 12 * mobileScaleFactor) + 30 * mobileScaleFactor)
+                    dropdownObj.buttonFrame.Size = UDim2.new(0, newWidth, 0, 21 * mobileScaleFactor)
+                    dropdownObj.buttonFrame.Position = UDim2.new(1, -newWidth - 10, 0, yPosition)
                     createOptionsYay()
                     if groupObj.Library._searchQuery ~= "" then
                         groupObj.Library:ApplySearchFilter(groupObj.Library._searchQuery)
                     end
+                end
+
+                if dropdownConfig.AutoRefresh then
+                    task.spawn(function()
+                        while not groupObj.Library._destroyed and dropdownObj.buttonFrame and dropdownObj.buttonFrame.Parent do
+                            local latestOptions = dropdownOptionsSource
+                            if type(dropdownConfig.OptionsProvider) == "function" then
+                                local ok, providedOptions = pcall(dropdownConfig.OptionsProvider)
+                                if ok and type(providedOptions) == "table" then
+                                    latestOptions = providedOptions
+                                end
+                            end
+                            local latestSignature = getDropdownOptionsSignature(latestOptions)
+                            if latestSignature ~= dropdownObj._optionsSignature then
+                                dropdownObj:UpdateOptions(latestOptions)
+                            end
+                            task.wait(dropdownConfig.RefreshInterval)
+                        end
+                    end)
                 end
 
                 function dropdownObj:Close()
@@ -4995,18 +5077,37 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 multiDropdownConfig = multiDropdownConfig or {}
                 multiDropdownConfig.Name = multiDropdownConfig.Name or "Multi Dropdown"
                 multiDropdownConfig.Options = multiDropdownConfig.Options or {"Option 1", "Option 2", "Option 3"}
+                multiDropdownConfig.OptionsProvider = multiDropdownConfig.OptionsProvider or multiDropdownConfig.GetOptions
+                multiDropdownConfig.AutoRefresh = multiDropdownConfig.AutoRefresh ~= false
+                multiDropdownConfig.RefreshInterval = math.max(tonumber(multiDropdownConfig.RefreshInterval) or 0.85, 0.35)
                 multiDropdownConfig.Default = multiDropdownConfig.Default or {}
                 multiDropdownConfig.Callback = multiDropdownConfig.Callback or function() end
                 multiDropdownConfig.Flag = multiDropdownConfig.Flag or createAutoFlag(multiDropdownConfig.Name)
+                local multiDropdownOptionsSource = multiDropdownConfig.Options
+                if type(multiDropdownConfig.OptionsProvider) == "function" then
+                    local ok, providedOptions = pcall(multiDropdownConfig.OptionsProvider)
+                    if ok and type(providedOptions) == "table" then
+                        multiDropdownOptionsSource = providedOptions
+                    end
+                end
+                multiDropdownConfig.Options = normalizeDropdownOptions(multiDropdownOptionsSource)
                 addSearchTerm(multiDropdownConfig.Name)
                 for _, option in ipairs(multiDropdownConfig.Options) do
-                    addSearchTerm(option)
+                    addSearchTerm(tostring(option))
                 end
                 
                 local multiDropdownObj = {}
                 multiDropdownObj.selectedValues = {}
-                for _, v in ipairs(multiDropdownConfig.Default) do multiDropdownObj.selectedValues[v] = true end
+                for _, v in ipairs(multiDropdownConfig.Default) do
+                    if table.find(multiDropdownConfig.Options, v) then
+                        multiDropdownObj.selectedValues[v] = true
+                    end
+                end
                 multiDropdownObj.isOpen = false
+                multiDropdownObj._optionsSignature = getDropdownOptionsSignature(multiDropdownOptionsSource)
+                if multiDropdownObj._optionsSignature == "0" then
+                    multiDropdownObj._optionsSignature = getDropdownOptionsSignature(multiDropdownConfig.Options)
+                end
                 local yPosition = groupObj.elementYPos
                 
                 multiDropdownObj.labelText = makeThingExist("TextLabel", {
@@ -5177,7 +5278,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                         local optionLabelText = makeThingExist("TextLabel", {
                             FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
                             TextColor3 = isSelected and groupObj.Library.config.AccentColor or Color3.fromRGB(124, 124, 124),
-                            Text = option, BackgroundTransparency = 1, Position = UDim2.new(0, 34, 0, 0),
+                            Text = tostring(option), BackgroundTransparency = 1, Position = UDim2.new(0, 34, 0, 0),
                             TextSize = 14 * mobileScaleFactor, Size = UDim2.new(1, -46, 1, 0),
                             TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 10002, Parent = optionFrame
                         })
@@ -5267,8 +5368,15 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 end)
                 
                 function multiDropdownObj:Set(values)
+                    if type(values) ~= "table" then
+                        values = {}
+                    end
                     multiDropdownObj.selectedValues = {}
-                    for _, v in ipairs(values) do multiDropdownObj.selectedValues[v] = true end
+                    for _, v in ipairs(values) do
+                        if table.find(multiDropdownConfig.Options, v) then
+                            multiDropdownObj.selectedValues[v] = true
+                        end
+                    end
                     local newDisplayText = getDisplayText()
                     multiDropdownObj.selectedLabelText.Text = newDisplayText
                     local newWidth = math.max(85 * mobileScaleFactor, howWideIsThisText(newDisplayText, 12 * mobileScaleFactor) + 35 * mobileScaleFactor)
@@ -5279,14 +5387,50 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 end
                 
                 function multiDropdownObj:UpdateOptions(newOptions)
-                    multiDropdownConfig.Options = newOptions
-                    for _, option in ipairs(multiDropdownConfig.Options) do
-                        addSearchTerm(option)
+                    if type(newOptions) ~= "table" then
+                        return
                     end
+                    multiDropdownOptionsSource = newOptions
+                    multiDropdownObj._optionsSignature = getDropdownOptionsSignature(newOptions)
+                    multiDropdownConfig.Options = normalizeDropdownOptions(newOptions)
+                    for _, option in ipairs(multiDropdownConfig.Options) do
+                        addSearchTerm(tostring(option))
+                    end
+                    local filteredSelectedValues = {}
+                    for option, isSelected in pairs(multiDropdownObj.selectedValues) do
+                        if isSelected and table.find(multiDropdownConfig.Options, option) then
+                            filteredSelectedValues[option] = true
+                        end
+                    end
+                    multiDropdownObj.selectedValues = filteredSelectedValues
+                    local newDisplayText = getDisplayText()
+                    multiDropdownObj.selectedLabelText.Text = newDisplayText
+                    local newWidth = math.max(85 * mobileScaleFactor, howWideIsThisText(newDisplayText, 12 * mobileScaleFactor) + 35 * mobileScaleFactor)
+                    multiDropdownObj.buttonFrame.Size = UDim2.new(0, newWidth, 0, 21 * mobileScaleFactor)
+                    multiDropdownObj.buttonFrame.Position = UDim2.new(1, -newWidth - 10, 0, yPosition)
                     createMultiOptionsYay()
                     if groupObj.Library._searchQuery ~= "" then
                         groupObj.Library:ApplySearchFilter(groupObj.Library._searchQuery)
                     end
+                end
+
+                if multiDropdownConfig.AutoRefresh then
+                    task.spawn(function()
+                        while not groupObj.Library._destroyed and multiDropdownObj.buttonFrame and multiDropdownObj.buttonFrame.Parent do
+                            local latestOptions = multiDropdownOptionsSource
+                            if type(multiDropdownConfig.OptionsProvider) == "function" then
+                                local ok, providedOptions = pcall(multiDropdownConfig.OptionsProvider)
+                                if ok and type(providedOptions) == "table" then
+                                    latestOptions = providedOptions
+                                end
+                            end
+                            local latestSignature = getDropdownOptionsSignature(latestOptions)
+                            if latestSignature ~= multiDropdownObj._optionsSignature then
+                                multiDropdownObj:UpdateOptions(latestOptions)
+                            end
+                            task.wait(multiDropdownConfig.RefreshInterval)
+                        end
+                    end)
                 end
                 
                 function multiDropdownObj:Get() return getSelectedArray() end
