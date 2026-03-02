@@ -5604,7 +5604,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 textInputConfig = textInputConfig or {}
                 textInputConfig.Name = textInputConfig.Name or "Input"
                 textInputConfig.Placeholder = textInputConfig.Placeholder or "Enter text..."
-                textInputConfig.Default = textInputConfig.Default or ""
+                textInputConfig.Default = tostring(textInputConfig.Default or "")
                 textInputConfig.Callback = textInputConfig.Callback or function() end
                 textInputConfig.Flag = textInputConfig.Flag or createAutoFlag(textInputConfig.Name)
                 addSearchTerm(textInputConfig.Name)
@@ -5612,6 +5612,8 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 
                 local textInputObj = {}
                 textInputObj.value = textInputConfig.Default
+                textInputObj.Flag = textInputConfig.Flag
+                textInputObj.Name = textInputConfig.Name
                 local yPosition = groupObj.elementYPos
                 
                 textInputObj.labelText = makeThingExist("TextLabel", {
@@ -5657,13 +5659,30 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 end)
                 
                 function textInputObj:Set(text)
-                    textInputObj.value = text
-                    textInputObj.textBox.Text = text
+                    local asString = tostring(text or "")
+                    textInputObj.value = asString
+                    textInputObj.textBox.Text = asString
                 end
                 
                 function textInputObj:Get()
                     return textInputObj.value
                 end
+
+                function textInputObj:GetValue()
+                    return textInputObj:Get()
+                end
+
+                function textInputObj:SetValue(text, silent)
+                    textInputObj:Set(tostring(text or ""))
+                    if not silent then
+                        textInputConfig.Callback(textInputObj.value, false)
+                    end
+                end
+
+                function textInputObj:ResetValue()
+                    textInputObj:Set(textInputConfig.Default)
+                end
+
                 groupObj.Library:RegisterControl(textInputConfig.Flag, function()
                     return textInputObj:Get()
                 end, function(value)
@@ -5675,6 +5694,72 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 updateGroupSizeYay()
                 table.insert(groupObj.elementsInGroup, textInputObj)
                 return textInputObj
+            end
+
+            function groupObj:AddTextbox(textboxConfig)
+                textboxConfig = textboxConfig or {}
+
+                local primaryCallback = textboxConfig.Callback
+                if type(primaryCallback) ~= "function" then
+                    primaryCallback = textboxConfig.Function
+                end
+                if type(primaryCallback) ~= "function" then
+                    primaryCallback = function() end
+                end
+
+                local changedCallback = textboxConfig.ChangedCallback or textboxConfig.OnChanged
+                local signalCallback = textboxConfig.OnPressed or textboxConfig.Signal
+                local enterOnly = textboxConfig.EnterOnly == true
+                local defaultText = tostring(textboxConfig.Default or textboxConfig.Value or "")
+
+                local function fireTextboxCallbacks(value, enterPressed)
+                    if enterOnly and not enterPressed then
+                        return
+                    end
+                    primaryCallback(value, enterPressed)
+                    if type(changedCallback) == "function" then
+                        changedCallback(value, enterPressed)
+                    end
+                    if type(signalCallback) == "function" then
+                        signalCallback(value, enterPressed)
+                    end
+                end
+
+                local function fireTextboxCallbacksForced(value, enterPressed)
+                    primaryCallback(value, enterPressed)
+                    if type(changedCallback) == "function" then
+                        changedCallback(value, enterPressed)
+                    end
+                    if type(signalCallback) == "function" then
+                        signalCallback(value, enterPressed)
+                    end
+                end
+
+                local textInputObj = groupObj:AddTextInput({
+                    Name = textboxConfig.Name or textboxConfig.Title or textboxConfig.Text or "Textbox",
+                    Placeholder = textboxConfig.Placeholder or textboxConfig.PlaceholderText or textboxConfig.Hint or "Enter text...",
+                    Default = defaultText,
+                    Callback = fireTextboxCallbacks,
+                    Flag = textboxConfig.Flag or textboxConfig.ConfigId
+                })
+
+                textInputObj.Title = textboxConfig.Title or textboxConfig.Text or textboxConfig.Name or "Textbox"
+                textInputObj.ConfigId = tostring(textboxConfig.ConfigId or textInputObj.Flag or textInputObj.Title)
+                textInputObj.Box = textInputObj.textBox
+
+                local baseSetValue = textInputObj.SetValue
+                function textInputObj:SetValue(text, silent)
+                    baseSetValue(self, text, true)
+                    if not silent then
+                        fireTextboxCallbacksForced(self:Get(), false)
+                    end
+                end
+
+                return textInputObj
+            end
+
+            function groupObj:AddTextBox(textboxConfig)
+                return groupObj:AddTextbox(textboxConfig)
             end
             
             function groupObj:AddColorPicker(colorPickerConfig)
