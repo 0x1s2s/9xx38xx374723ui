@@ -214,6 +214,67 @@ local function getDropdownOptionsSignature(options)
     return table.concat(signaturePieces, "\31")
 end
 
+local function getNumberDecimalPlaces(value)
+    if type(value) ~= "number" then
+        return 0
+    end
+    local valueString = tostring(value)
+    local decimalPart = valueString:match("%.(%d+)")
+    if decimalPart then
+        return #decimalPart
+    end
+    local exponentPart = valueString:match("[eE]([%+%-]?%d+)")
+    if exponentPart then
+        local exponent = tonumber(exponentPart) or 0
+        if exponent < 0 then
+            return -exponent
+        end
+    end
+    return 0
+end
+
+local function roundToDecimalPlaces(value, decimals)
+    if decimals <= 0 then
+        if value >= 0 then
+            return math.floor(value + 0.5)
+        end
+        return math.ceil(value - 0.5)
+    end
+    local factor = 10 ^ decimals
+    if value >= 0 then
+        return math.floor(value * factor + 0.5) / factor
+    end
+    return math.ceil(value * factor - 0.5) / factor
+end
+
+local function resolveSliderPrecision(minValue, maxValue, increment, defaultValue)
+    local precision = 0
+    precision = math.max(precision, getNumberDecimalPlaces(minValue))
+    precision = math.max(precision, getNumberDecimalPlaces(maxValue))
+    precision = math.max(precision, getNumberDecimalPlaces(increment))
+    precision = math.max(precision, getNumberDecimalPlaces(defaultValue))
+    return math.clamp(precision, 0, 6)
+end
+
+local function normalizeSliderValue(value, minValue, maxValue, increment, precision)
+    local numericValue = tonumber(value) or minValue
+    numericValue = math.clamp(numericValue, minValue, maxValue)
+    local normalizedIncrement = math.max(math.abs(tonumber(increment) or 1), 1e-6)
+    local steps = math.floor(((numericValue - minValue) / normalizedIncrement) + 0.5)
+    local snappedValue = minValue + (steps * normalizedIncrement)
+    snappedValue = roundToDecimalPlaces(snappedValue, precision)
+    return math.clamp(snappedValue, minValue, maxValue)
+end
+
+local function formatSliderValue(value, precision)
+    if precision <= 0 then
+        return tostring(roundToDecimalPlaces(value, 0))
+    end
+    local formatted = string.format("%." .. tostring(precision) .. "f", value)
+    formatted = formatted:gsub("(%..-)0+$", "%1"):gsub("%.$", "")
+    return formatted
+end
+
 local function serializeConfigValue(value)
     local valueType = typeof(value)
     if valueType == "Color3" then
@@ -3866,6 +3927,23 @@ function superMegaAwesomeLibrary:CreateSection(config)
         tabObj.leftColumnFrame = makeThingExist("Frame", {BackgroundTransparency = 1, Size = UDim2.new(0, 262 * mobileScaleFactor, 0, 1000), Parent = tabObj.contentScroll})
         tabObj.rightColumnFrame = makeThingExist("Frame", {BackgroundTransparency = 1, Position = UDim2.new(0, 272 * mobileScaleFactor, 0, 0), Size = UDim2.new(0, 262 * mobileScaleFactor, 0, 1000), Parent = tabObj.contentScroll})
         
+        local groupSpacingY = 15 * mobileScaleFactor
+        local function relayoutGroupsYay()
+            local sideOffsets = {Left = 0, Right = 0}
+            for _, group in ipairs(tabObj.groupsInTab) do
+                if group.mainFrame and group.mainFrame.Parent then
+                    local side = group.side == "Right" and "Right" or "Left"
+                    local nextY = sideOffsets[side]
+                    group.mainFrame.Position = UDim2.new(0, 1, 0, nextY + 1)
+                    sideOffsets[side] = nextY + group.mainFrame.Size.Y.Offset + groupSpacingY
+                end
+            end
+            tabObj.groupPositions.Left = sideOffsets.Left
+            tabObj.groupPositions.Right = sideOffsets.Right
+            local maxHeight = math.max(sideOffsets.Left, sideOffsets.Right)
+            tabObj.contentScroll.CanvasSize = UDim2.new(0, 540 * mobileScaleFactor, 0, maxHeight)
+        end
+        
         function tabObj:Activate()
             if tabObj.isActive then
                 return
@@ -3933,12 +4011,18 @@ function superMegaAwesomeLibrary:CreateSection(config)
             groupConfig.Name = groupConfig.Name or "Group"
             groupConfig.Side = groupConfig.Side or "Left"
             groupConfig.Icon = groupConfig.Icon or "rbxassetid://10723427199"
+            if string.lower(tostring(groupConfig.Side)) == "right" then
+                groupConfig.Side = "Right"
+            else
+                groupConfig.Side = "Left"
+            end
             
             local groupObj = {}
             groupObj.groupNameForSearch = groupConfig.Name
             groupObj.searchTerms = {groupConfig.Name}
             groupObj.elementsInGroup = {}
             groupObj.Library = tabObj.Library
+            groupObj.side = groupConfig.Side
             groupObj.elementYPos = 35 * mobileScaleFactor
             local function createAutoFlag(elementName)
                 return tostring(tabObj.tabNameForSearch) .. "." .. tostring(groupObj.groupNameForSearch) .. "." .. tostring(elementName or "Value")
@@ -3950,12 +4034,11 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 end
             end
             
-            local parentColumn = groupConfig.Side == "Left" and tabObj.leftColumnFrame or tabObj.rightColumnFrame
+            local parentColumn = groupObj.side == "Left" and tabObj.leftColumnFrame or tabObj.rightColumnFrame
             local groupWidth = 260 * mobileScaleFactor
-            local yPosStart = tabObj.groupPositions[groupConfig.Side]
             
             groupObj.mainFrame = makeThingExist("Frame", {
-                BackgroundColor3 = Color3.fromRGB(18, 18, 18), Position = UDim2.new(0, 1, 0, yPosStart + 1),
+                BackgroundColor3 = Color3.fromRGB(18, 18, 18), Position = UDim2.new(0, 1, 0, 1),
                 Size = UDim2.new(0, groupWidth, 0, 50 * mobileScaleFactor),
                 ClipsDescendants = true, Parent = parentColumn
             })
@@ -3983,9 +4066,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
             local function updateGroupSizeYay()
                 local newHeight = groupObj.elementYPos + 10 * mobileScaleFactor
                 groupObj.mainFrame.Size = UDim2.new(0, groupWidth, 0, newHeight)
-                tabObj.groupPositions[groupConfig.Side] = yPosStart + newHeight + 15 * mobileScaleFactor
-                local maxHeight = math.max(tabObj.groupPositions.Left, tabObj.groupPositions.Right)
-                tabObj.contentScroll.CanvasSize = UDim2.new(0, 540 * mobileScaleFactor, 0, maxHeight)
+                relayoutGroupsYay()
             end
 
             function groupObj:AddToggle(toggleConfig)
@@ -4058,16 +4139,37 @@ function superMegaAwesomeLibrary:CreateSection(config)
             function groupObj:AddSlider(sliderConfig)
                 sliderConfig = sliderConfig or {}
                 sliderConfig.Name = sliderConfig.Name or "Slider"
-                sliderConfig.Min = sliderConfig.Min or 0
-                sliderConfig.Max = sliderConfig.Max or 100
-                sliderConfig.Default = sliderConfig.Default or sliderConfig.Min
-                sliderConfig.Increment = sliderConfig.Increment or 1
+                sliderConfig.Min = tonumber(sliderConfig.Min) or 0
+                sliderConfig.Max = tonumber(sliderConfig.Max) or 100
+                if sliderConfig.Max < sliderConfig.Min then
+                    sliderConfig.Min, sliderConfig.Max = sliderConfig.Max, sliderConfig.Min
+                end
+                sliderConfig.Default = tonumber(sliderConfig.Default)
+                if sliderConfig.Default == nil then
+                    sliderConfig.Default = sliderConfig.Min
+                end
+                sliderConfig.Increment = math.abs(tonumber(sliderConfig.Increment) or 1)
+                if sliderConfig.Increment < 1e-6 then
+                    sliderConfig.Increment = 1
+                end
                 sliderConfig.Callback = sliderConfig.Callback or function() end
                 sliderConfig.Flag = sliderConfig.Flag or createAutoFlag(sliderConfig.Name)
                 addSearchTerm(sliderConfig.Name)
                 
+                local sliderPrecision = resolveSliderPrecision(sliderConfig.Min, sliderConfig.Max, sliderConfig.Increment, sliderConfig.Default)
+                local sliderRange = sliderConfig.Max - sliderConfig.Min
+                local function getSliderPercentage(value)
+                    if sliderRange <= 0 then
+                        return 0
+                    end
+                    return math.clamp((value - sliderConfig.Min) / sliderRange, 0, 1)
+                end
+                local function formatValue(value)
+                    return formatSliderValue(value, sliderPrecision)
+                end
+                
                 local sliderObj = {}
-                sliderObj.value = sliderConfig.Default
+                sliderObj.value = normalizeSliderValue(sliderConfig.Default, sliderConfig.Min, sliderConfig.Max, sliderConfig.Increment, sliderPrecision)
                 local yPosition = groupObj.elementYPos
                 local sliderWidth = 238 * mobileScaleFactor
                 
@@ -4086,7 +4188,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 })
                 makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = sliderObj.backgroundFrame})
                 
-                local percentage = (sliderObj.value - sliderConfig.Min) / (sliderConfig.Max - sliderConfig.Min)
+                local percentage = getSliderPercentage(sliderObj.value)
                 sliderObj.fillFrame = makeThingExist("Frame", {
                     BackgroundColor3 = groupObj.Library.config.AccentColor,
                     Size = UDim2.new(0, sliderWidth * percentage, 0, 12 * mobileScaleFactor), Parent = sliderObj.backgroundFrame
@@ -4095,7 +4197,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 
                 sliderObj.valueLabelText = makeThingExist("TextLabel", {
                     FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
-                    TextColor3 = Color3.fromRGB(124, 124, 124), Text = tostring(sliderObj.value) .. " / " .. tostring(sliderConfig.Max),
+                    TextColor3 = Color3.fromRGB(124, 124, 124), Text = formatValue(sliderObj.value) .. " / " .. formatValue(sliderConfig.Max),
                     BackgroundTransparency = 1, Position = UDim2.new(1, -80 * mobileScaleFactor, 0, yPosition),
                     TextSize = 14 * mobileScaleFactor, Size = UDim2.new(0, 70 * mobileScaleFactor, 0, 20 * mobileScaleFactor),
                     TextXAlignment = Enum.TextXAlignment.Right, Parent = groupObj.mainFrame
@@ -4104,12 +4206,11 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 local sliderClickButton = makeThingExist("TextButton", {Text = "", BackgroundTransparency = 1, Size = UDim2.new(1, 0, 1, 0), Parent = sliderObj.backgroundFrame})
                 
                 function sliderObj:Set(value)
-                    value = math.clamp(value, sliderConfig.Min, sliderConfig.Max)
-                    value = math.floor(value / sliderConfig.Increment + 0.5) * sliderConfig.Increment
+                    value = normalizeSliderValue(value, sliderConfig.Min, sliderConfig.Max, sliderConfig.Increment, sliderPrecision)
                     sliderObj.value = value
-                    local percentage = (value - sliderConfig.Min) / (sliderConfig.Max - sliderConfig.Min)
+                    local percentage = getSliderPercentage(value)
                     smoothMoveGoWoosh(sliderObj.fillFrame, {Size = UDim2.new(0, sliderWidth * percentage, 0, 12 * mobileScaleFactor)}, 0.1)
-                    sliderObj.valueLabelText.Text = tostring(value) .. " / " .. tostring(sliderConfig.Max)
+                    sliderObj.valueLabelText.Text = formatValue(value) .. " / " .. formatValue(sliderConfig.Max)
                     sliderConfig.Callback(value)
                 end
 
@@ -4125,12 +4226,12 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 groupObj.Library:_TrackConnection(thisInputServiceGoesHard.InputChanged:Connect(function(input)
                     if isDraggingSlider and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
                         local percentage = math.clamp((input.Position.X - sliderObj.backgroundFrame.AbsolutePosition.X) / sliderObj.backgroundFrame.AbsoluteSize.X, 0, 1)
-                        local value = sliderConfig.Min + (sliderConfig.Max - sliderConfig.Min) * percentage
+                        local value = sliderConfig.Min + sliderRange * percentage
                         sliderObj:Set(value)
                     end
                 end))
                 
-                if sliderConfig.Default ~= sliderConfig.Min then sliderConfig.Callback(sliderConfig.Default) end
+                if sliderObj.value ~= sliderConfig.Min then sliderConfig.Callback(sliderObj.value) end
                 groupObj.Library:RegisterControl(sliderConfig.Flag, function()
                     return sliderObj:Get()
                 end, function(value)
@@ -5882,9 +5983,8 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 return colorPickerObj
             end
             
-            updateGroupSizeYay()
-            tabObj.groupPositions[groupConfig.Side] = yPosStart + groupObj.mainFrame.Size.Y.Offset + 15 * mobileScaleFactor
             table.insert(tabObj.groupsInTab, groupObj)
+            updateGroupSizeYay()
             return groupObj
         end
         
