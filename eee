@@ -18,14 +18,100 @@ local mouseGoClickClick = theOneAndOnlyPlayer:GetMouse()
 
 local isMobileUserSadly = thisInputServiceGoesHard.TouchEnabled and not thisInputServiceGoesHard.KeyboardEnabled
 local mobileScaleFactor = isMobileUserSadly and 0.7 or 1
+local nativeFontObject = Font
+local defaultFlowUIFontEnum = Enum.Font.GothamSemibold
+local defaultFlowUIFontFamily = "rbxasset://fonts/families/GothamSSm.json"
+
+local function resolveFlowUIFontEnum(weight)
+    if weight == Enum.FontWeight.Bold then
+        return Enum.Font.GothamBold
+    end
+    if weight == Enum.FontWeight.Medium then
+        return Enum.Font.GothamMedium
+    end
+    return defaultFlowUIFontEnum
+end
+
+local flowUIFontFaceSupported = false
+do
+    local probe = Instance.new("TextLabel")
+    flowUIFontFaceSupported = pcall(function()
+        probe.FontFace = nativeFontObject.new(defaultFlowUIFontFamily, Enum.FontWeight.SemiBold, Enum.FontStyle.Normal)
+    end)
+    probe:Destroy()
+end
+
+local function makeFlowUIFontDescriptor(family, weight, style, enumFont)
+    return {
+        __flowUIFontDescriptor = true,
+        Family = family or defaultFlowUIFontFamily,
+        Weight = weight or Enum.FontWeight.SemiBold,
+        Style = style or Enum.FontStyle.Normal,
+        EnumFont = enumFont or resolveFlowUIFontEnum(weight)
+    }
+end
+
+local function isFlowUIFontDescriptor(value)
+    return type(value) == "table" and value.__flowUIFontDescriptor == true
+end
+
+local function getFallbackFlowUIFont(value, fallbackEnum)
+    if isFlowUIFontDescriptor(value) then
+        return value.EnumFont or fallbackEnum or defaultFlowUIFontEnum
+    end
+    return fallbackEnum or defaultFlowUIFontEnum
+end
+
+local function applyFlowUIFont(instance, value, fallbackEnum)
+    if not instance or not (instance:IsA("TextLabel") or instance:IsA("TextButton") or instance:IsA("TextBox")) then
+        return false
+    end
+
+    if flowUIFontFaceSupported and not isFlowUIFontDescriptor(value) and value ~= nil then
+        local ok = pcall(function()
+            instance.FontFace = value
+        end)
+        if ok then
+            return true
+        end
+    end
+
+    pcall(function()
+        instance.Font = getFallbackFlowUIFont(value, fallbackEnum)
+    end)
+    return false
+end
+
+local Font = {
+    new = function(family, weight, style)
+        family = family or defaultFlowUIFontFamily
+        weight = weight or Enum.FontWeight.SemiBold
+        style = style or Enum.FontStyle.Normal
+        if flowUIFontFaceSupported and nativeFontObject and nativeFontObject.new then
+            return nativeFontObject.new(family, weight, style)
+        end
+        return makeFlowUIFontDescriptor(family, weight, style)
+    end,
+    fromEnum = function(enumFont)
+        enumFont = enumFont or defaultFlowUIFontEnum
+        if flowUIFontFaceSupported and nativeFontObject and nativeFontObject.fromEnum then
+            return nativeFontObject.fromEnum(enumFont)
+        end
+        return makeFlowUIFontDescriptor(defaultFlowUIFontFamily, Enum.FontWeight.SemiBold, Enum.FontStyle.Normal, enumFont)
+    end
+}
 
 local function makeThingExist(className, properties)
     local whatWeJustMade = Instance.new(className)
     for property, value in pairs(properties) do
         if property ~= "Parent" then
-            pcall(function()
-                whatWeJustMade[property] = value
-            end)
+            if property == "FontFace" then
+                applyFlowUIFont(whatWeJustMade, value)
+            else
+                pcall(function()
+                    whatWeJustMade[property] = value
+                end)
+            end
         end
     end
     if properties.Parent then
@@ -315,6 +401,54 @@ local function sanitizeConfigName(name)
         cleanName = "default"
     end
     return cleanName
+end
+
+local function getFlowUIConfigFolderPath()
+    return "FlowUIConfigs"
+end
+
+local function ensureFlowUIConfigFolder()
+    local folder = getFlowUIConfigFolderPath()
+
+    if isfolder and isfolder(folder) then
+        return true, folder
+    end
+
+    if makefolder then
+        local ok = pcall(function()
+            makefolder(folder)
+        end)
+        if ok then
+            return true, folder
+        end
+        if isfolder and isfolder(folder) then
+            return true, folder
+        end
+    end
+
+    return false, folder
+end
+
+local function getFlowUIConfigFileName(configName)
+    return sanitizeConfigName(configName) .. ".json"
+end
+
+local function getWritableFlowUIConfigPath(configName)
+    local fileName = getFlowUIConfigFileName(configName)
+    local okFolder, folder = ensureFlowUIConfigFolder()
+    if okFolder then
+        return folder .. "/" .. fileName, true
+    end
+    return fileName, false
+end
+
+local function getReadableFlowUIConfigPaths(configName)
+    local fileName = getFlowUIConfigFileName(configName)
+    local folder = getFlowUIConfigFolderPath()
+    return {
+        folder .. "/" .. fileName,
+        fileName
+    }
 end
 
 function superMegaAwesomeLibrary.new(config)
@@ -806,9 +940,7 @@ function superMegaAwesomeLibrary:ApplyFontPreset(index)
                         obj.Font = preset.EnumFont
                     end)
                 end
-                pcall(function()
-                    obj.FontFace = targetFontFace
-                end)
+                applyFlowUIFont(obj, targetFontFace, preset.EnumFont or defaultFlowUIFontEnum)
             end
         end
     end
@@ -2436,15 +2568,10 @@ function superMegaAwesomeLibrary:ApplySearchFilter(rawQuery)
 end
 
 function superMegaAwesomeLibrary:SaveConfig(fileName)
-    if not writefile or not isfolder then
-        return false, "writefile/isfolder APIs are unavailable in this executor."
+    if not writefile then
+        return false, "writefile API is unavailable in this executor."
     end
-    
-    local folder = "FlowUIConfigs"
-    if not isfolder(folder) then
-        return false, "Config folder not found: " .. folder
-    end
-    
+
     local configName = sanitizeConfigName(fileName)
     local payload = {
         version = 1,
@@ -2458,30 +2585,43 @@ function superMegaAwesomeLibrary:SaveConfig(fileName)
             payload.controls[flag] = serializeConfigValue(value)
         end
     end
-    
-    local path = folder .. "/" .. configName .. ".json"
+
+    local path, usingFolder = getWritableFlowUIConfigPath(configName)
     local encoded = httpServiceNoCap:JSONEncode(payload)
     local okWrite, errWrite = pcall(function()
         writefile(path, encoded)
     end)
+
+    if not okWrite and usingFolder then
+        path = getFlowUIConfigFileName(configName)
+        okWrite, errWrite = pcall(function()
+            writefile(path, encoded)
+        end)
+    end
+
     if not okWrite then
         return false, "Failed to write config file: " .. tostring(errWrite)
     end
-    return true
+    return true, path
 end
 
 function superMegaAwesomeLibrary:LoadConfig(fileName)
     if not readfile or not isfile then
         return false, "readfile/isfile APIs are unavailable in this executor."
     end
-    
-    local folder = "FlowUIConfigs"
+
     local configName = sanitizeConfigName(fileName)
-    local path = folder .. "/" .. configName .. ".json"
-    if not isfile(path) then
-        return false, "Config file not found: " .. path
+    local path = nil
+    for _, candidatePath in ipairs(getReadableFlowUIConfigPaths(configName)) do
+        if isfile(candidatePath) then
+            path = candidatePath
+            break
+        end
     end
-    
+    if not path then
+        return false, "Config file not found: " .. getFlowUIConfigFolderPath() .. "/" .. getFlowUIConfigFileName(configName)
+    end
+
     local okDecode, data = pcall(function()
         return httpServiceNoCap:JSONDecode(readfile(path))
     end)
@@ -2496,8 +2636,8 @@ function superMegaAwesomeLibrary:LoadConfig(fileName)
             pcall(control.set, decodedValue)
         end
     end
-    
-    return true
+
+    return true, path
 end
 
 function superMegaAwesomeLibrary:CreateUIBecauseWeNeedIt()
