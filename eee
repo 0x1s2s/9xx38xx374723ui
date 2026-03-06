@@ -18,7 +18,6 @@ local mouseGoClickClick = theOneAndOnlyPlayer:GetMouse()
 
 local isMobileUserSadly = thisInputServiceGoesHard.TouchEnabled and not thisInputServiceGoesHard.KeyboardEnabled
 local mobileScaleFactor = isMobileUserSadly and 0.7 or 1
-local nativeFontObject = Font
 local defaultFlowUIFontEnum = Enum.Font.GothamSemibold
 local defaultFlowUIFontFamily = "rbxasset://fonts/families/GothamSSm.json"
 
@@ -33,13 +32,6 @@ local function resolveFlowUIFontEnum(weight)
 end
 
 local flowUIFontFaceSupported = false
-do
-    local probe = Instance.new("TextLabel")
-    flowUIFontFaceSupported = pcall(function()
-        probe.FontFace = nativeFontObject.new(defaultFlowUIFontFamily, Enum.FontWeight.SemiBold, Enum.FontStyle.Normal)
-    end)
-    probe:Destroy()
-end
 
 local function makeFlowUIFontDescriptor(family, weight, style, enumFont)
     return {
@@ -67,15 +59,6 @@ local function applyFlowUIFont(instance, value, fallbackEnum)
         return false
     end
 
-    if flowUIFontFaceSupported and not isFlowUIFontDescriptor(value) and value ~= nil then
-        local ok = pcall(function()
-            instance.FontFace = value
-        end)
-        if ok then
-            return true
-        end
-    end
-
     pcall(function()
         instance.Font = getFallbackFlowUIFont(value, fallbackEnum)
     end)
@@ -87,16 +70,10 @@ local Font = {
         family = family or defaultFlowUIFontFamily
         weight = weight or Enum.FontWeight.SemiBold
         style = style or Enum.FontStyle.Normal
-        if flowUIFontFaceSupported and nativeFontObject and nativeFontObject.new then
-            return nativeFontObject.new(family, weight, style)
-        end
         return makeFlowUIFontDescriptor(family, weight, style)
     end,
     fromEnum = function(enumFont)
         enumFont = enumFont or defaultFlowUIFontEnum
-        if flowUIFontFaceSupported and nativeFontObject and nativeFontObject.fromEnum then
-            return nativeFontObject.fromEnum(enumFont)
-        end
         return makeFlowUIFontDescriptor(defaultFlowUIFontFamily, Enum.FontWeight.SemiBold, Enum.FontStyle.Normal, enumFont)
     end
 }
@@ -412,18 +389,6 @@ local function ensureFlowUIConfigFolder()
 
     if isfolder and isfolder(folder) then
         return true, folder
-    end
-
-    if makefolder then
-        local ok = pcall(function()
-            makefolder(folder)
-        end)
-        if ok then
-            return true, folder
-        end
-        if isfolder and isfolder(folder) then
-            return true, folder
-        end
     end
 
     return false, folder
