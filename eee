@@ -506,6 +506,14 @@ function superMegaAwesomeLibrary.new(config)
     self._destroyed = false
     self._connections = {}
     self._trackedControls = {}
+    self._lastControlRegistration = 0
+    self._autoConfigName = sanitizeConfigName((self.config.Name or "FlowUI") .. "_last")
+    self._autoConfigEnabled = true
+    self._autoConfigLoadAttempted = false
+    self._autoConfigAccumulator = 0
+    self._autoConfigInterval = 1.2
+    self._autoConfigSnapshot = nil
+    self._isApplyingConfig = false
     self._smoothScrollFrames = {}
     self._searchQuery = ""
     self._fpsRollingSize = 60
@@ -624,6 +632,86 @@ function superMegaAwesomeLibrary:RegisterControl(flag, getter, setter)
         get = getter,
         set = setter
     }
+    self._lastControlRegistration = os.clock()
+end
+
+function superMegaAwesomeLibrary:_BuildAutoConfigSnapshot()
+    local controlsSnapshot = {}
+    local trackedFlags = {}
+
+    for flag in pairs(self._trackedControls) do
+        table.insert(trackedFlags, flag)
+    end
+
+    table.sort(trackedFlags)
+
+    for _, flag in ipairs(trackedFlags) do
+        local control = self._trackedControls[flag]
+        if control and type(control.get) == "function" then
+            local ok, value = pcall(control.get)
+            if ok then
+                controlsSnapshot[flag] = serializeConfigValue(value)
+            end
+        end
+    end
+
+    local okEncode, encoded = pcall(function()
+        return httpServiceNoCap:JSONEncode(controlsSnapshot)
+    end)
+
+    if okEncode then
+        return encoded
+    end
+
+    return nil
+end
+
+function superMegaAwesomeLibrary:_TryAutoSaveConfig(forceSave)
+    if self._destroyed or not self._autoConfigEnabled or self._isApplyingConfig then
+        return false
+    end
+
+    if not writefile or next(self._trackedControls) == nil then
+        return false
+    end
+
+    local snapshot = self:_BuildAutoConfigSnapshot()
+    if not snapshot then
+        return false
+    end
+
+    if not forceSave and snapshot == self._autoConfigSnapshot then
+        return false
+    end
+
+    local okSave = self:SaveConfig(self._autoConfigName)
+    if okSave then
+        self._autoConfigSnapshot = snapshot
+    end
+
+    return okSave == true
+end
+
+function superMegaAwesomeLibrary:_TryAutoLoadConfig(forceAttempt)
+    if self._destroyed then
+        return false
+    end
+
+    if self._autoConfigLoadAttempted and not forceAttempt then
+        return false
+    end
+
+    if not readfile or not isfile or next(self._trackedControls) == nil then
+        return false
+    end
+
+    self._isApplyingConfig = true
+    local okLoad = self:LoadConfig(self._autoConfigName)
+    self._isApplyingConfig = false
+    self._autoConfigLoadAttempted = true
+    self._autoConfigAccumulator = 0
+    self._autoConfigSnapshot = self:_BuildAutoConfigSnapshot()
+    return okLoad == true
 end
 
 function superMegaAwesomeLibrary:_RefreshViewportMetrics()
@@ -2805,6 +2893,21 @@ function superMegaAwesomeLibrary:CreateUIBecauseWeNeedIt()
         if self._fpsRollingTotal > 0 and (self._fpsRollingCount or 0) > 0 then
             self._latestFPSValue = math.clamp(math.floor(((self._fpsRollingCount or 0) / self._fpsRollingTotal) + 0.5), 1, 360)
         end
+
+        local nowClock = os.clock()
+        if not self._autoConfigLoadAttempted then
+            if next(self._trackedControls) ~= nil and (nowClock - (self._lastControlRegistration or nowClock)) >= 1.25 then
+                self:_TryAutoLoadConfig(false)
+            end
+        elseif self._autoConfigEnabled then
+            self._autoConfigAccumulator = (self._autoConfigAccumulator or 0) + dt
+            if self._autoConfigAccumulator >= (self._autoConfigInterval or 1.2) then
+                self._autoConfigAccumulator = 0
+                self:_TryAutoSaveConfig(false)
+            end
+        else
+            self._autoConfigAccumulator = 0
+        end
         
         for scrollingFrame, state in pairs(self._smoothScrollFrames) do
             if not scrollingFrame or not scrollingFrame.Parent then
@@ -3344,7 +3447,7 @@ function superMegaAwesomeLibrary:CreateMainFrameYay()
     })
 
     local settingsPanelWidth = 185 * mobileScaleFactor
-    local settingsPanelHeight = 268 * mobileScaleFactor
+    local settingsPanelHeight = 292 * mobileScaleFactor
     self.uiSettingsOpen = false
 
     self.uiSettingsButtonFrame = makeThingExist("Frame", {
@@ -3500,7 +3603,14 @@ function superMegaAwesomeLibrary:CreateMainFrameYay()
     local hideNameToggleRef = createSettingsToggle("Hide Name", self._uiVisualSettings.HideName, function(enabled)
         self:_SetNameHidden(enabled)
     end)
-    self.uiSettingsToggleRefs = {blurToggleRef, overlayToggleRef, bgFxToggleRef, gradientToggleRef, espPreviewToggleRef, hideNameToggleRef}
+    local autoSaveToggleRef = createSettingsToggle("Auto Save Config", self._autoConfigEnabled, function(enabled)
+        self._autoConfigEnabled = enabled == true
+        if self._autoConfigEnabled then
+            self._autoConfigAccumulator = self._autoConfigInterval or 1.2
+            self:_TryAutoSaveConfig(true)
+        end
+    end)
+    self.uiSettingsToggleRefs = {blurToggleRef, overlayToggleRef, bgFxToggleRef, gradientToggleRef, espPreviewToggleRef, hideNameToggleRef, autoSaveToggleRef}
 
     local overlayRow = makeThingExist("Frame", {
         BackgroundTransparency = 1,
@@ -6379,6 +6489,11 @@ end
 
 function superMegaAwesomeLibrary:Destroy()
     if self._destroyed then return end
+
+    pcall(function()
+        self:_TryAutoSaveConfig(true)
+    end)
+
     self._destroyed = true
 
     for _, section in ipairs(self.sectionsAreAwesome) do
