@@ -459,6 +459,16 @@ local function ensureFlowUIConfigFolder()
         return true, folder
     end
 
+    if makefolder then
+        pcall(function()
+            makefolder(folder)
+        end)
+    end
+
+    if isfolder and isfolder(folder) then
+        return true, folder
+    end
+
     return false, folder
 end
 
@@ -480,6 +490,7 @@ local function getReadableFlowUIConfigPaths(configName)
     local folder = getFlowUIConfigFolderPath()
     return {
         folder .. "/" .. fileName,
+        folder .. "\\" .. fileName,
         fileName
     }
 end
@@ -2748,36 +2759,69 @@ function superMegaAwesomeLibrary:SaveConfig(fileName)
         end
     end
 
-    local path, usingFolder = getWritableFlowUIConfigPath(configName)
     local encoded = httpServiceNoCap:JSONEncode(payload)
-    local okWrite, errWrite = pcall(function()
-        writefile(path, encoded)
-    end)
+    local writableCandidates = {}
+    local fileOnlyName = getFlowUIConfigFileName(configName)
+    local okFolder, folderPath = ensureFlowUIConfigFolder()
+    if okFolder then
+        table.insert(writableCandidates, folderPath .. "/" .. fileOnlyName)
+        table.insert(writableCandidates, folderPath .. "\\" .. fileOnlyName)
+    end
+    table.insert(writableCandidates, fileOnlyName)
 
-    if not okWrite and usingFolder then
-        path = getFlowUIConfigFileName(configName)
-        okWrite, errWrite = pcall(function()
-            writefile(path, encoded)
-        end)
+    local visitedPaths = {}
+    local lastWriteError = nil
+    local savedPath = nil
+
+    for _, candidatePath in ipairs(writableCandidates) do
+        if not visitedPaths[candidatePath] then
+            visitedPaths[candidatePath] = true
+            local okWrite, errWrite = pcall(function()
+                writefile(candidatePath, encoded)
+            end)
+
+            if okWrite then
+                savedPath = candidatePath
+                break
+            else
+                lastWriteError = errWrite
+            end
+        end
     end
 
-    if not okWrite then
-        return false, "Failed to write config file: " .. tostring(errWrite)
+    if not savedPath then
+        return false, "Failed to write config file: " .. tostring(lastWriteError)
     end
-    return true, path
+    return true, savedPath
 end
 
 function superMegaAwesomeLibrary:LoadConfig(fileName)
-    if not readfile or not isfile then
-        return false, "readfile/isfile APIs are unavailable in this executor."
+    if not readfile then
+        return false, "readfile API is unavailable in this executor."
     end
 
     local configName = sanitizeConfigName(fileName)
     local path = nil
+    local rawConfig = nil
     for _, candidatePath in ipairs(getReadableFlowUIConfigPaths(configName)) do
-        if isfile(candidatePath) then
-            path = candidatePath
-            break
+        local canRead = true
+        if isfile then
+            local okExists, exists = pcall(function()
+                return isfile(candidatePath)
+            end)
+            canRead = okExists and exists == true
+        end
+
+        if canRead then
+            local okRead, fileData = pcall(function()
+                return readfile(candidatePath)
+            end)
+
+            if okRead and type(fileData) == "string" then
+                path = candidatePath
+                rawConfig = fileData
+                break
+            end
         end
     end
     if not path then
@@ -2785,7 +2829,7 @@ function superMegaAwesomeLibrary:LoadConfig(fileName)
     end
 
     local okDecode, data = pcall(function()
-        return httpServiceNoCap:JSONDecode(readfile(path))
+        return httpServiceNoCap:JSONDecode(rawConfig)
     end)
     if not okDecode or type(data) ~= "table" or type(data.controls) ~= "table" then
         return false, "Invalid config JSON format."
