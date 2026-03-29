@@ -519,12 +519,20 @@ function superMegaAwesomeLibrary.new(config)
     self._trackedControls = {}
     self._lastControlRegistration = 0
     self._autoConfigName = sanitizeConfigName((self.config.Name or "FlowUI") .. "_last")
-    self._autoConfigEnabled = true
-    self._autoConfigLoadAttempted = false
+    local autoConfigSetting = self.config.AutoConfig
+    if autoConfigSetting == nil then
+        autoConfigSetting = self.config.AutoSaveConfig
+    end
+    if autoConfigSetting == nil then
+        autoConfigSetting = true
+    end
+    self._autoConfigEnabled = autoConfigSetting == true
+    self._autoConfigLoadAttempted = not self._autoConfigEnabled
     self._autoConfigAccumulator = 0
     self._autoConfigInterval = 1.2
     self._autoConfigSnapshot = nil
     self._isApplyingConfig = false
+    self._configPathHints = {}
     self._smoothScrollFrames = {}
     self._searchQuery = ""
     self._fpsRollingSize = 60
@@ -712,7 +720,7 @@ function superMegaAwesomeLibrary:_TryAutoLoadConfig(forceAttempt)
         return false
     end
 
-    if not readfile or not isfile or next(self._trackedControls) == nil then
+    if not readfile or next(self._trackedControls) == nil then
         return false
     end
 
@@ -2792,6 +2800,9 @@ function superMegaAwesomeLibrary:SaveConfig(fileName)
     if not savedPath then
         return false, "Failed to write config file: " .. tostring(lastWriteError)
     end
+
+    self._configPathHints[configName] = savedPath
+
     return true, savedPath
 end
 
@@ -2803,7 +2814,22 @@ function superMegaAwesomeLibrary:LoadConfig(fileName)
     local configName = sanitizeConfigName(fileName)
     local path = nil
     local rawConfig = nil
-    for _, candidatePath in ipairs(getReadableFlowUIConfigPaths(configName)) do
+    local readableCandidates = getReadableFlowUIConfigPaths(configName)
+    local hintedPath = self._configPathHints and self._configPathHints[configName]
+
+    if type(hintedPath) == "string" and hintedPath ~= "" then
+        table.insert(readableCandidates, 1, hintedPath)
+    end
+
+    local visitedPaths = {}
+
+    for _, candidatePath in ipairs(readableCandidates) do
+        if visitedPaths[candidatePath] then
+            continue
+        end
+
+        visitedPaths[candidatePath] = true
+
         local canRead = true
         if isfile then
             local okExists, exists = pcall(function()
@@ -3335,8 +3361,16 @@ function superMegaAwesomeLibrary:CreateWatermarkBecauseWeCool()
 end
 
 function superMegaAwesomeLibrary:CreateMainFrameYay()
-    local frameWidth = 753 * mobileScaleFactor
+    local frameWidth = 785 * mobileScaleFactor
     local frameHeight = 493 * mobileScaleFactor
+    local headerLeftPadding = 10 * mobileScaleFactor
+    local headerAvatarBaseX = 160 * mobileScaleFactor
+    local headerAvatarSize = 30 * mobileScaleFactor
+    local headerAvatarGap = 10 * mobileScaleFactor
+    local searchWidth = 214 * mobileScaleFactor
+    local searchRightPadding = 12 * mobileScaleFactor
+    local contentStartX = 198 * mobileScaleFactor
+    local contentRightPadding = 7 * mobileScaleFactor
     
     self.mainFrameYay = makeThingExist("Frame", {
         Name = "MainFrameIsAwesome",
@@ -3388,13 +3422,23 @@ function superMegaAwesomeLibrary:CreateMainFrameYay()
     makeDraggableCuzWeCan(self.mainFrameYay, self.dragBarThing, self)
     
     local hubNameWidth = howWideIsThisText(self.config.Name, 17 * mobileScaleFactor, Enum.Font.GothamSemibold)
+    local searchX = frameWidth - searchWidth - searchRightPadding
+    local avatarX = math.min(
+        searchX - headerAvatarSize - 18 * mobileScaleFactor,
+        math.max(headerAvatarBaseX, headerLeftPadding + hubNameWidth + headerAvatarGap)
+    )
+    local headerNameMaxWidth = math.max(110 * mobileScaleFactor, avatarX - headerLeftPadding - headerAvatarGap)
+    local avatarRight = avatarX + headerAvatarSize
+    local tabHeaderX = math.max(201 * mobileScaleFactor, avatarRight + 18 * mobileScaleFactor)
+    local separatorWidth = math.max(156 * mobileScaleFactor, avatarRight - 19 * mobileScaleFactor)
+    local contentWidth = frameWidth - contentStartX - contentRightPadding
     
     self.hubNameLabel = makeThingExist("TextLabel", {
         FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
         TextColor3 = Color3.new(1, 1, 1), Text = self.config.Name, BackgroundTransparency = 1,
-        Position = UDim2.new(0, 10, 0, 14 * mobileScaleFactor), TextSize = 17 * mobileScaleFactor,
-        Size = UDim2.new(0, hubNameWidth + 10, 0, 20 * mobileScaleFactor),
-        TextXAlignment = Enum.TextXAlignment.Left, Parent = self.mainFrameYay
+        Position = UDim2.new(0, headerLeftPadding, 0, 14 * mobileScaleFactor), TextSize = 17 * mobileScaleFactor,
+        Size = UDim2.new(0, headerNameMaxWidth, 0, 20 * mobileScaleFactor),
+        TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left, Parent = self.mainFrameYay
     })
     table.insert(self._gradientLabels, self.hubNameLabel)
     
@@ -3402,7 +3446,7 @@ function superMegaAwesomeLibrary:CreateMainFrameYay()
     self.userNameLabel = makeThingExist("TextLabel", {
         FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
         TextColor3 = Color3.fromRGB(46, 46, 46), Text = playerName, BackgroundTransparency = 1,
-        Position = UDim2.new(0, 10, 0, 34 * mobileScaleFactor), TextSize = 14 * mobileScaleFactor,
+        Position = UDim2.new(0, headerLeftPadding, 0, 34 * mobileScaleFactor), TextSize = 14 * mobileScaleFactor,
         Size = UDim2.new(0, 120 * mobileScaleFactor, 0, 18 * mobileScaleFactor),
         TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd,
         Parent = self.mainFrameYay
@@ -3411,21 +3455,21 @@ function superMegaAwesomeLibrary:CreateMainFrameYay()
     
     self.playerAvatarImg = makeThingExist("ImageLabel", {
         Image = getPlayerAvatarCuzTheyreBeautiful(theOneAndOnlyPlayer.UserId), BackgroundTransparency = 1,
-        Position = UDim2.new(0, 145 * mobileScaleFactor, 0, 17 * mobileScaleFactor),
-        Size = UDim2.new(0, 30 * mobileScaleFactor, 0, 30 * mobileScaleFactor), Parent = self.mainFrameYay
+        Position = UDim2.new(0, avatarX, 0, 17 * mobileScaleFactor),
+        Size = UDim2.new(0, headerAvatarSize, 0, headerAvatarSize), Parent = self.mainFrameYay
     })
     makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = self.playerAvatarImg})
     
     self.lineSeperator = makeThingExist("Frame", {
         BackgroundColor3 = Color3.fromRGB(36, 36, 36),
         Position = UDim2.new(0, 19, 0, 64 * mobileScaleFactor),
-        Size = UDim2.new(0, 156 * mobileScaleFactor, 0, 1), Parent = self.mainFrameYay
+        Size = UDim2.new(0, separatorWidth, 0, 1), Parent = self.mainFrameYay
     })
     
     self.tabNameLabel = makeThingExist("TextLabel", {
         FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
         TextColor3 = Color3.new(1, 1, 1), Text = "tab name", BackgroundTransparency = 1,
-        Position = UDim2.new(0, 201 * mobileScaleFactor, 0, 14 * mobileScaleFactor),
+        Position = UDim2.new(0, tabHeaderX, 0, 14 * mobileScaleFactor),
         TextSize = 17 * mobileScaleFactor, Size = UDim2.new(0, 78, 0, 20 * mobileScaleFactor),
         TextXAlignment = Enum.TextXAlignment.Left, Parent = self.mainFrameYay
     })
@@ -3434,15 +3478,15 @@ function superMegaAwesomeLibrary:CreateMainFrameYay()
     self.tabDescriptionLabel = makeThingExist("TextLabel", {
         FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
         TextColor3 = Color3.fromRGB(46, 46, 46), Text = "tab description", BackgroundTransparency = 1,
-        Position = UDim2.new(0, 201 * mobileScaleFactor, 0, 34 * mobileScaleFactor),
+        Position = UDim2.new(0, tabHeaderX, 0, 34 * mobileScaleFactor),
         TextSize = 14 * mobileScaleFactor, Size = UDim2.new(0, 200, 0, 18 * mobileScaleFactor),
         TextXAlignment = Enum.TextXAlignment.Left, Parent = self.mainFrameYay
     })
 
     self.searchFrame = makeThingExist("Frame", {
         BackgroundColor3 = Color3.fromRGB(22, 22, 22),
-        Position = UDim2.new(0, 524 * mobileScaleFactor, 0, 16 * mobileScaleFactor),
-        Size = UDim2.new(0, 214 * mobileScaleFactor, 0, 28 * mobileScaleFactor),
+        Position = UDim2.new(0, searchX, 0, 16 * mobileScaleFactor),
+        Size = UDim2.new(0, searchWidth, 0, 28 * mobileScaleFactor),
         Parent = self.mainFrameYay
     })
     makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = self.searchFrame})
@@ -3485,8 +3529,8 @@ function superMegaAwesomeLibrary:CreateMainFrameYay()
     --self:EnableSmoothScrolling(self.sectionHolderScroll, 34)
     
     self.contentHolderFrame = makeThingExist("Frame", {
-        BackgroundTransparency = 1, Position = UDim2.new(0, 198 * mobileScaleFactor, 0, 62 * mobileScaleFactor),
-        Size = UDim2.new(0, 548 * mobileScaleFactor, 0, 424 * mobileScaleFactor),
+        BackgroundTransparency = 1, Position = UDim2.new(0, contentStartX, 0, 62 * mobileScaleFactor),
+        Size = UDim2.new(0, contentWidth, 0, 424 * mobileScaleFactor),
         ClipsDescendants = true, Parent = self.mainFrameYay
     })
 
@@ -3647,14 +3691,24 @@ function superMegaAwesomeLibrary:CreateMainFrameYay()
     local hideNameToggleRef = createSettingsToggle("Hide Name", self._uiVisualSettings.HideName, function(enabled)
         self:_SetNameHidden(enabled)
     end)
-    local autoSaveToggleRef = createSettingsToggle("Auto Save Config", self._autoConfigEnabled, function(enabled)
-        self._autoConfigEnabled = enabled == true
-        if self._autoConfigEnabled then
-            self._autoConfigAccumulator = self._autoConfigInterval or 1.2
-            self:_TryAutoSaveConfig(true)
-        end
-    end)
-    self.uiSettingsToggleRefs = {blurToggleRef, overlayToggleRef, bgFxToggleRef, gradientToggleRef, espPreviewToggleRef, hideNameToggleRef, autoSaveToggleRef}
+    local autoSaveToggleRef = nil
+    if self.config.ShowAutoSaveToggle ~= false then
+        autoSaveToggleRef = createSettingsToggle("Auto Save Config", self._autoConfigEnabled, function(enabled)
+            self._autoConfigEnabled = enabled == true
+            if self._autoConfigEnabled then
+                self._autoConfigLoadAttempted = false
+                self._autoConfigAccumulator = self._autoConfigInterval or 1.2
+                self:_TryAutoSaveConfig(true)
+            else
+                self._autoConfigAccumulator = 0
+            end
+        end)
+    end
+
+    self.uiSettingsToggleRefs = {blurToggleRef, overlayToggleRef, bgFxToggleRef, gradientToggleRef, espPreviewToggleRef, hideNameToggleRef}
+    if autoSaveToggleRef then
+        table.insert(self.uiSettingsToggleRefs, autoSaveToggleRef)
+    end
 
     local overlayRow = makeThingExist("Frame", {
         BackgroundTransparency = 1,
