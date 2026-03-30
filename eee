@@ -3276,8 +3276,10 @@ end
 
 function superMegaAwesomeLibrary:ToggleUI()
     self.isToggledOn = not self.isToggledOn
+    local openPosition = self._mainFrameOpenPosition or UDim2.new(0.5, -392 * mobileScaleFactor, 0.5, -262 * mobileScaleFactor)
+    local closedPosition = self._mainFrameClosedPosition or UDim2.new(0.5, openPosition.X.Offset, 1.5, 0)
     smoothMoveGoWoosh(self.mainFrameYay, {
-        Position = self.isToggledOn and UDim2.new(0.5, -376 * mobileScaleFactor, 0.5, -246 * mobileScaleFactor) or UDim2.new(0.5, -376 * mobileScaleFactor, 1.5, 0)
+        Position = self.isToggledOn and openPosition or closedPosition
     }, 0.4, Enum.EasingStyle.Quint, self.isToggledOn and Enum.EasingDirection.Out or Enum.EasingDirection.In)
     self:_ApplyOpenCloseVisuals(false)
 end
@@ -3436,8 +3438,8 @@ function superMegaAwesomeLibrary:CreateWatermarkBecauseWeCool()
 end
 
 function superMegaAwesomeLibrary:CreateMainFrameYay()
-    local frameWidth = 785 * mobileScaleFactor
-    local frameHeight = 493 * mobileScaleFactor
+    local frameWidth = 830 * mobileScaleFactor
+    local frameHeight = 530 * mobileScaleFactor
     local headerLeftPadding = 10 * mobileScaleFactor
     local headerAvatarBaseX = 160 * mobileScaleFactor
     local headerAvatarSize = 30 * mobileScaleFactor
@@ -3446,11 +3448,15 @@ function superMegaAwesomeLibrary:CreateMainFrameYay()
     local searchRightPadding = 12 * mobileScaleFactor
     local contentStartX = 198 * mobileScaleFactor
     local contentRightPadding = 7 * mobileScaleFactor
+    local sectionScrollHeight = 441 * mobileScaleFactor
+    local contentHeight = 461 * mobileScaleFactor
+    self._mainFrameOpenPosition = UDim2.new(0.5, -frameWidth/2, 0.5, -frameHeight/2)
+    self._mainFrameClosedPosition = UDim2.new(0.5, -frameWidth/2, 1.5, 0)
     
     self.mainFrameYay = makeThingExist("Frame", {
         Name = "MainFrameIsAwesome",
         BackgroundColor3 = Color3.fromRGB(16, 16, 16),
-        Position = UDim2.new(0.5, -frameWidth/2, 0.5, -frameHeight/2),
+        Position = self._mainFrameOpenPosition,
         BorderSizePixel = 0,
         Size = UDim2.new(0, frameWidth, 0, frameHeight),
         Parent = self.screenGuiYay
@@ -3594,7 +3600,7 @@ function superMegaAwesomeLibrary:CreateMainFrameYay()
     
     self.sectionHolderScroll = makeThingExist("ScrollingFrame", {
         BackgroundTransparency = 1, Position = UDim2.new(0, 17, 0, 75 * mobileScaleFactor),
-        Size = UDim2.new(0, 162 * mobileScaleFactor, 0, 404 * mobileScaleFactor),
+        Size = UDim2.new(0, 162 * mobileScaleFactor, 0, sectionScrollHeight),
         ScrollBarThickness = 0, CanvasSize = UDim2.new(0, 0, 0, 0),
         AutomaticCanvasSize = Enum.AutomaticSize.Y, ClipsDescendants = true, Parent = self.mainFrameYay
     })
@@ -3605,7 +3611,7 @@ function superMegaAwesomeLibrary:CreateMainFrameYay()
     
     self.contentHolderFrame = makeThingExist("Frame", {
         BackgroundTransparency = 1, Position = UDim2.new(0, contentStartX, 0, 62 * mobileScaleFactor),
-        Size = UDim2.new(0, contentWidth, 0, 424 * mobileScaleFactor),
+        Size = UDim2.new(0, contentWidth, 0, contentHeight),
         ClipsDescendants = true, Parent = self.mainFrameYay
     })
 
