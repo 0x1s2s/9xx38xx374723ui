@@ -4719,6 +4719,8 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 if sliderConfig.Increment < 1e-6 then
                     sliderConfig.Increment = 1
                 end
+                sliderConfig.Suffix = tostring(sliderConfig.Suffix or "")
+                sliderConfig.ShowMax = sliderConfig.ShowMax == true
                 sliderConfig.Callback = sliderConfig.Callback or function() end
                 sliderConfig.Flag = sliderConfig.Flag or createAutoFlag(sliderConfig.Name)
                 addSearchTerm(sliderConfig.Name)
@@ -4731,92 +4733,80 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     end
                     return math.clamp((value - sliderConfig.Min) / sliderRange, 0, 1)
                 end
-                local function formatValue(value)
-                    return formatSliderValue(value, sliderPrecision)
+                local function formatDisplayValue(value)
+                    local text = formatSliderValue(value, sliderPrecision) .. sliderConfig.Suffix
+                    if sliderConfig.ShowMax then
+                        return text .. " / " .. formatSliderValue(sliderConfig.Max, sliderPrecision) .. sliderConfig.Suffix
+                    end
+                    return text
                 end
                 
                 local sliderObj = {}
                 sliderObj.value = normalizeSliderValue(sliderConfig.Default, sliderConfig.Min, sliderConfig.Max, sliderConfig.Increment, sliderPrecision)
                 local yPosition = groupObj.elementYPos
                 local sliderWidth = 238 * mobileScaleFactor
-                local sliderValueWidth = 78 * mobileScaleFactor
-                local sliderTrackHeight = 12 * mobileScaleFactor
-                local sliderTrackLineHeight = 4 * mobileScaleFactor
-                local sliderKnobSize = 10 * mobileScaleFactor
-                local sliderKnobHalf = sliderKnobSize * 0.5
+                local valueLabelWidth = 72 * mobileScaleFactor
+                local sliderHitHeight = 18 * mobileScaleFactor
+                local sliderTrackHeight = 8 * mobileScaleFactor
+                local sliderKnobWidth = 8 * mobileScaleFactor
+                local sliderKnobHeight = 16 * mobileScaleFactor
+                local sliderKnobHalfWidth = sliderKnobWidth * 0.5
                 
                 sliderObj.labelText = makeThingExist("TextLabel", {
                     FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
-                    TextColor3 = Color3.fromRGB(154, 154, 160), Text = sliderConfig.Name, BackgroundTransparency = 1,
-                    Position = UDim2.new(0, 10, 0, yPosition), TextSize = 14 * mobileScaleFactor,
-                    Size = UDim2.new(0, sliderWidth - sliderValueWidth - 8 * mobileScaleFactor, 0, 20 * mobileScaleFactor),
+                    TextColor3 = Color3.fromRGB(118, 118, 130), Text = sliderConfig.Name, BackgroundTransparency = 1,
+                    Position = UDim2.new(0, 10, 0, yPosition), TextSize = 13.5 * mobileScaleFactor,
+                    Size = UDim2.new(0, sliderWidth - valueLabelWidth - 10 * mobileScaleFactor, 0, 18 * mobileScaleFactor),
                     TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd,
                     Parent = groupObj.mainFrame
                 })
-
+                
                 sliderObj.backgroundFrame = makeThingExist("Frame", {
                     BackgroundTransparency = 1,
-                    Position = UDim2.new(0, 10, 0, yPosition + 23 * mobileScaleFactor),
-                    Size = UDim2.new(0, sliderWidth, 0, sliderTrackHeight),
+                    Position = UDim2.new(0, 10, 0, yPosition + 18 * mobileScaleFactor),
+                    Size = UDim2.new(0, sliderWidth, 0, sliderHitHeight),
                     Parent = groupObj.mainFrame
                 })
 
                 sliderObj.trackFrame = makeThingExist("Frame", {
-                    BackgroundColor3 = Color3.fromRGB(31, 31, 35),
+                    BackgroundColor3 = Color3.fromRGB(43, 43, 51),
                     BorderSizePixel = 0,
-                    Position = UDim2.new(0, 0, 0.5, -sliderTrackLineHeight * 0.5),
-                    Size = UDim2.new(0, sliderWidth, 0, sliderTrackLineHeight),
+                    Position = UDim2.new(0, 0, 0.5, -sliderTrackHeight * 0.5),
+                    Size = UDim2.new(0, sliderWidth, 0, sliderTrackHeight),
                     Parent = sliderObj.backgroundFrame
                 })
                 makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = sliderObj.trackFrame})
-                sliderObj.trackStroke = makeThingExist("UIStroke", {
-                    Color = Color3.fromRGB(38, 38, 42),
-                    Thickness = 1,
-                    Parent = sliderObj.trackFrame
-                })
-                
+
                 local percentage = getSliderPercentage(sliderObj.value)
                 sliderObj.fillFrame = makeThingExist("Frame", {
                     BackgroundColor3 = groupObj.Library.config.AccentColor,
                     BorderSizePixel = 0,
-                    Size = UDim2.new(0, sliderWidth * percentage, 0, sliderTrackLineHeight),
+                    Size = UDim2.new(0, sliderWidth * percentage, 1, 0),
                     Parent = sliderObj.trackFrame
                 })
                 makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = sliderObj.fillFrame})
 
-                sliderObj.knobGlow = nil
                 sliderObj.knobFrame = makeThingExist("Frame", {
-                    BackgroundColor3 = Color3.fromRGB(14, 14, 16),
+                    BackgroundColor3 = Color3.fromRGB(244, 244, 248),
                     BorderSizePixel = 0,
                     AnchorPoint = Vector2.new(0.5, 0.5),
-                    Position = UDim2.new(0, math.clamp(sliderWidth * percentage, sliderKnobHalf, sliderWidth - sliderKnobHalf), 0.5, 0),
-                    Size = UDim2.new(0, sliderKnobSize, 0, sliderKnobSize),
+                    Position = UDim2.new(0, math.clamp(sliderWidth * percentage, sliderKnobHalfWidth, sliderWidth - sliderKnobHalfWidth), 0.5, 0),
+                    Size = UDim2.new(0, sliderKnobWidth, 0, sliderKnobHeight),
                     ZIndex = 2,
                     Parent = sliderObj.backgroundFrame
                 })
-                makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = sliderObj.knobFrame})
-                sliderObj.knobStroke = makeThingExist("UIStroke", {
-                    Color = groupObj.Library.config.AccentColor,
+                makeThingExist("UICorner", {CornerRadius = UDim.new(0, 2 * mobileScaleFactor), Parent = sliderObj.knobFrame})
+                makeThingExist("UIStroke", {
+                    Color = Color3.fromRGB(196, 196, 204),
                     Thickness = 1,
                     Parent = sliderObj.knobFrame
                 })
-                sliderObj.knobCore = makeThingExist("Frame", {
-                    BackgroundColor3 = groupObj.Library.config.AccentColor,
-                    BorderSizePixel = 0,
-                    AnchorPoint = Vector2.new(0.5, 0.5),
-                    Position = UDim2.new(0.5, 0, 0.5, 0),
-                    Size = UDim2.new(0, math.max(3, math.floor(sliderKnobSize * 0.42)), 0, math.max(3, math.floor(sliderKnobSize * 0.42))),
-                    Parent = sliderObj.knobFrame
-                })
-                makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = sliderObj.knobCore})
                 
                 sliderObj.valueLabelText = makeThingExist("TextLabel", {
                     FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
-                    TextColor3 = Color3.fromRGB(162, 162, 168), Text = formatValue(sliderObj.value) .. " / " .. formatValue(sliderConfig.Max),
-                    BackgroundTransparency = 1,
-                    Position = UDim2.new(1, -sliderValueWidth - 10 * mobileScaleFactor, 0, yPosition),
-                    TextSize = 12.5 * mobileScaleFactor,
-                    Size = UDim2.new(0, sliderValueWidth, 0, 20 * mobileScaleFactor),
+                    TextColor3 = Color3.fromRGB(184, 184, 194), Text = formatDisplayValue(sliderObj.value),
+                    BackgroundTransparency = 1, Position = UDim2.new(1, -valueLabelWidth - 10 * mobileScaleFactor, 0, yPosition),
+                    TextSize = 13.5 * mobileScaleFactor, Size = UDim2.new(0, valueLabelWidth, 0, 18 * mobileScaleFactor),
                     TextXAlignment = Enum.TextXAlignment.Right, Parent = groupObj.mainFrame
                 })
                 
@@ -4824,11 +4814,10 @@ function superMegaAwesomeLibrary:CreateSection(config)
 
                 local function updateSliderVisuals(animate)
                     local currentPercentage = getSliderPercentage(sliderObj.value)
-                    local fillWidth = sliderWidth * currentPercentage
-                    local knobX = math.clamp(fillWidth, sliderKnobHalf, sliderWidth - sliderKnobHalf)
-                    local fillTarget = {Size = UDim2.new(0, fillWidth, 0, sliderTrackLineHeight)}
-                    local knobTarget = {Position = UDim2.new(0, knobX, 0.5, 0)}
-
+                    local fillTarget = {Size = UDim2.new(0, sliderWidth * currentPercentage, 1, 0)}
+                    local knobTarget = {
+                        Position = UDim2.new(0, math.clamp(sliderWidth * currentPercentage, sliderKnobHalfWidth, sliderWidth - sliderKnobHalfWidth), 0.5, 0)
+                    }
                     if animate then
                         smoothMoveGoWoosh(sliderObj.fillFrame, fillTarget, 0.12)
                         smoothMoveGoWoosh(sliderObj.knobFrame, knobTarget, 0.12, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
@@ -4836,8 +4825,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                         sliderObj.fillFrame.Size = fillTarget.Size
                         sliderObj.knobFrame.Position = knobTarget.Position
                     end
-
-                    sliderObj.valueLabelText.Text = formatValue(sliderObj.value) .. " / " .. formatValue(sliderConfig.Max)
+                    sliderObj.valueLabelText.Text = formatDisplayValue(sliderObj.value)
                 end
 
                 function sliderObj:Set(value, instant, silent)
@@ -4859,11 +4847,10 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     if not input then
                         return
                     end
-                    local percentage = math.clamp((input.Position.X - sliderObj.backgroundFrame.AbsolutePosition.X) / math.max(1, sliderObj.backgroundFrame.AbsoluteSize.X), 0, 1)
-                    local value = sliderConfig.Min + sliderRange * percentage
+                    local percentageNow = math.clamp((input.Position.X - sliderObj.backgroundFrame.AbsolutePosition.X) / math.max(1, sliderObj.backgroundFrame.AbsoluteSize.X), 0, 1)
+                    local value = sliderConfig.Min + sliderRange * percentageNow
                     sliderObj:Set(value, instant, false)
                 end
-
                 sliderClickButton.InputBegan:Connect(function(input)
                     local isMouse = input.UserInputType == Enum.UserInputType.MouseButton1
                     local isTouch = input.UserInputType == Enum.UserInputType.Touch
@@ -4873,25 +4860,11 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     isDraggingSlider = true
                     activeSliderInput = isTouch and input or nil
                     setSliderFromInput(input, true)
-                    smoothMoveGoWoosh(sliderObj.trackStroke, {Color = groupObj.Library.config.AccentColor:Lerp(Color3.fromRGB(20, 20, 22), 0.2)}, 0.12)
-                end)
-                sliderClickButton.MouseEnter:Connect(function()
-                    if isDraggingSlider then
-                        return
-                    end
-                    smoothMoveGoWoosh(sliderObj.trackStroke, {Color = Color3.fromRGB(52, 52, 56)}, 0.12)
-                end)
-                sliderClickButton.MouseLeave:Connect(function()
-                    if isDraggingSlider then
-                        return
-                    end
-                    smoothMoveGoWoosh(sliderObj.trackStroke, {Color = Color3.fromRGB(38, 38, 42)}, 0.12)
                 end)
                 groupObj.Library:_TrackConnection(thisInputServiceGoesHard.InputEnded:Connect(function(input)
                     if input.UserInputType == Enum.UserInputType.MouseButton1 or (input.UserInputType == Enum.UserInputType.Touch and (activeSliderInput == nil or input == activeSliderInput)) then
                         isDraggingSlider = false
                         activeSliderInput = nil
-                        smoothMoveGoWoosh(sliderObj.trackStroke, {Color = Color3.fromRGB(38, 38, 42)}, 0.12)
                     end
                 end))
                 groupObj.Library:_TrackConnection(thisInputServiceGoesHard.InputChanged:Connect(function(input)
@@ -4899,7 +4872,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                         setSliderFromInput(input, true)
                     end
                 end))
-                
+
                 updateSliderVisuals(false)
                 groupObj.Library:RegisterControl(sliderConfig.Flag, function()
                     return sliderObj:Get()
