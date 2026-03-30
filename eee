@@ -597,7 +597,7 @@ function superMegaAwesomeLibrary.new(config)
         autoConfigSetting = self.config.AutoSaveConfig
     end
     if autoConfigSetting == nil then
-        autoConfigSetting = true
+        autoConfigSetting = false
     end
     self._autoConfigEnabled = autoConfigSetting == true
     self._autoConfigLoadAttempted = not self._autoConfigEnabled
@@ -2437,14 +2437,14 @@ function superMegaAwesomeLibrary:_UpdateESPPreview(dt)
     local resolvedDt = tonumber(dt) or 0
     if resolvedDt > 0 then
         self._espPreviewUpdateAccumulator = (tonumber(self._espPreviewUpdateAccumulator) or 0) + resolvedDt
-        local updateInterval = isMobileUserSadly and 0.075 or 0.06
+        local updateInterval = isMobileUserSadly and 0.22 or 0.16
         if self._latestFPSValue > 0 then
             if self._latestFPSValue < 40 then
-                updateInterval = isMobileUserSadly and 0.11 or 0.09
+                updateInterval = isMobileUserSadly and 0.28 or 0.22
             elseif self._latestFPSValue < 55 then
-                updateInterval = isMobileUserSadly and 0.09 or 0.075
+                updateInterval = isMobileUserSadly and 0.24 or 0.18
             elseif self._latestFPSValue > 95 then
-                updateInterval = isMobileUserSadly and 0.065 or 0.05
+                updateInterval = isMobileUserSadly and 0.18 or 0.12
             end
         end
         if self._espPreviewUpdateAccumulator < updateInterval then
@@ -2455,7 +2455,7 @@ function superMegaAwesomeLibrary:_UpdateESPPreview(dt)
     end
 
     self._espPreviewResolveAccumulator = self._espPreviewResolveAccumulator + resolvedDt
-    if not self._espPreviewState or self._espPreviewResolveAccumulator >= 0.16 then
+    if not self._espPreviewState or self._espPreviewResolveAccumulator >= 0.3 then
         self._espPreviewState = self:_ResolveESPPreviewState()
         self._espPreviewResolveAccumulator = 0
     end
@@ -3417,7 +3417,7 @@ function superMegaAwesomeLibrary:CreateWatermarkBecauseWeCool()
     local lastWatermarkWidth = 0
     task.spawn(function()
         while not self._destroyed do
-            task.wait(0.25)
+            task.wait(0.6)
             if self.watermarkFrame and self.watermarkFrame.Parent and self.watermarkTextLabel and self.watermarkTextLabel.Parent then
                 local timeNow = os.date("%H:%M:%S")
                 local fpsCount = self._latestFPSValue > 0 and self._latestFPSValue or 0
@@ -4672,8 +4672,8 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 
                 local toggleClickButton = makeThingExist("TextButton", {Text = "", BackgroundTransparency = 1, Size = UDim2.new(1, 0, 1, 0), Parent = toggleObj.switchFrame})
                 
-                function toggleObj:Set(value)
-                    toggleObj.value = value
+                function toggleObj:Set(value, silent)
+                    toggleObj.value = value == true
                     if toggleObj.value then
                         smoothMoveGoWoosh(toggleObj.switchFrame, {BackgroundColor3 = groupObj.Library.config.AccentColor}, 0.2)
                         smoothMoveGoWoosh(toggleObj.circleFrame, {Position = UDim2.new(0.462, 0, 0.143, 0), BackgroundColor3 = Color3.new(1, 1, 1)}, 0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
@@ -4681,19 +4681,20 @@ function superMegaAwesomeLibrary:CreateSection(config)
                         smoothMoveGoWoosh(toggleObj.switchFrame, {BackgroundColor3 = Color3.fromRGB(32, 32, 32)}, 0.2)
                         smoothMoveGoWoosh(toggleObj.circleFrame, {Position = UDim2.new(0.0104, 0, 0.143, 0), BackgroundColor3 = Color3.fromRGB(75, 75, 75)}, 0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
                     end
-                    toggleConfig.Callback(toggleObj.value)
+                    if not silent then
+                        toggleConfig.Callback(toggleObj.value)
+                    end
                 end
 
                 function toggleObj:Get()
                     return toggleObj.value
                 end
                 
-                toggleClickButton.MouseButton1Click:Connect(function() toggleObj:Set(not toggleObj.value) end)
-                if toggleConfig.Default then toggleConfig.Callback(true) end
+                toggleClickButton.MouseButton1Click:Connect(function() toggleObj:Set(not toggleObj.value, false) end)
                 groupObj.Library:RegisterControl(toggleConfig.Flag, function()
                     return toggleObj:Get()
                 end, function(value)
-                    toggleObj:Set(value == true)
+                    toggleObj:Set(value == true, true)
                 end)
                 
                 groupObj.elementYPos = groupObj.elementYPos + 28 * mobileScaleFactor
@@ -4868,11 +4869,13 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     sliderObj.valueLabelText.Text = formatValue(sliderObj.value) .. " / " .. formatValue(sliderConfig.Max)
                 end
 
-                function sliderObj:Set(value, instant)
+                function sliderObj:Set(value, instant, silent)
                     value = normalizeSliderValue(value, sliderConfig.Min, sliderConfig.Max, sliderConfig.Increment, sliderPrecision)
                     sliderObj.value = value
                     updateSliderVisuals(instant ~= true)
-                    sliderConfig.Callback(value)
+                    if not silent then
+                        sliderConfig.Callback(value)
+                    end
                 end
 
                 function sliderObj:Get()
@@ -4887,7 +4890,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     end
                     local percentage = math.clamp((input.Position.X - sliderObj.backgroundFrame.AbsolutePosition.X) / math.max(1, sliderObj.backgroundFrame.AbsoluteSize.X), 0, 1)
                     local value = sliderConfig.Min + sliderRange * percentage
-                    sliderObj:Set(value, instant)
+                    sliderObj:Set(value, instant, false)
                 end
 
                 sliderClickButton.InputBegan:Connect(function(input)
@@ -4931,11 +4934,10 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 end))
                 
                 updateSliderVisuals(false)
-                if sliderObj.value ~= sliderConfig.Min then sliderConfig.Callback(sliderObj.value) end
                 groupObj.Library:RegisterControl(sliderConfig.Flag, function()
                     return sliderObj:Get()
                 end, function(value)
-                    sliderObj:Set(tonumber(value) or sliderConfig.Min)
+                    sliderObj:Set(tonumber(value) or sliderConfig.Min, true, true)
                 end)
                 groupObj.elementYPos = groupObj.elementYPos + 40 * mobileScaleFactor
                 updateGroupSizeYay()
@@ -5264,7 +5266,9 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     end
                     keybindObj.mode = newMode
                     updateModeVisuals()
-                    keybindConfig.ModeChangedCallback(newMode)
+                    if not silent then
+                        keybindConfig.ModeChangedCallback(newMode)
+                    end
                     if not silent then
                         groupObj.Library:Notify({
                             Title = keybindConfig.Name .. " mode updated",
@@ -5275,7 +5279,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     end
                 end
                 
-                function keybindObj:Set(key)
+                function keybindObj:Set(key, silent)
                     if keybindObj.holdActive then
                         keybindObj.holdActive = false
                         keybindConfig.Callback(false)
@@ -5284,7 +5288,9 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     local newKeyText = getKeyText()
                     keybindObj.keyLabelText.Text = newKeyText
                     updateKeybindSizeYay(newKeyText)
-                    keybindConfig.ChangedCallback(key)
+                    if not silent then
+                        keybindConfig.ChangedCallback(key)
+                    end
                 end
 
                 function keybindObj:Get()
@@ -5355,7 +5361,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                             if pickedKey == Enum.KeyCode.Backspace or pickedKey == Enum.KeyCode.Delete then
                                 pickedKey = Enum.KeyCode.Unknown
                             end
-                            keybindObj:Set(pickedKey)
+                            keybindObj:Set(pickedKey, false)
                             smoothMoveGoWoosh(keybindObj.buttonFrame, {BackgroundColor3 = Color3.fromRGB(32, 32, 32)}, 0.2)
                         end
                     elseif not gameProcessed and input.UserInputType == Enum.UserInputType.Keyboard then
@@ -5407,7 +5413,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     return keybindObj:Get()
                 end, function(value)
                     if typeof(value) == "EnumItem" and value.EnumType == Enum.KeyCode then
-                        keybindObj:Set(value)
+                        keybindObj:Set(value, true)
                     end
                 end)
                 groupObj.Library:RegisterControl(keybindConfig.ModeFlag, function()
@@ -5491,8 +5497,8 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 local toggleClickButton = makeThingExist("TextButton", {Text = "", BackgroundTransparency = 1, Size = UDim2.new(1, 0, 1, 0), Parent = keybindToggleObj.toggleSwitchFrame})
                 local keybindClickButton = makeThingExist("TextButton", {Text = "", BackgroundTransparency = 1, Size = UDim2.new(1, 0, 1, 0), Parent = keybindToggleObj.keybindButtonFrame})
                 
-                function keybindToggleObj:SetToggle(value)
-                    keybindToggleObj.toggleValue = value
+                function keybindToggleObj:SetToggle(value, silent)
+                    keybindToggleObj.toggleValue = value == true
                     if value then
                         smoothMoveGoWoosh(keybindToggleObj.toggleSwitchFrame, {BackgroundColor3 = groupObj.Library.config.AccentColor}, 0.2)
                         smoothMoveGoWoosh(keybindToggleObj.toggleCircleFrame, {Position = UDim2.new(0.462, 0, 0.143, 0), BackgroundColor3 = Color3.new(1, 1, 1)}, 0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
@@ -5500,7 +5506,9 @@ function superMegaAwesomeLibrary:CreateSection(config)
                         smoothMoveGoWoosh(keybindToggleObj.toggleSwitchFrame, {BackgroundColor3 = Color3.fromRGB(32, 32, 32)}, 0.2)
                         smoothMoveGoWoosh(keybindToggleObj.toggleCircleFrame, {Position = UDim2.new(0.0104, 0, 0.143, 0), BackgroundColor3 = Color3.fromRGB(75, 75, 75)}, 0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
                     end
-                    keybindToggleConfig.ToggleCallback(value)
+                    if not silent then
+                        keybindToggleConfig.ToggleCallback(keybindToggleObj.toggleValue)
+                    end
                 end
                 
                 local function updateKeybindSizeYay(text)
@@ -5509,12 +5517,14 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     smoothMoveGoWoosh(keybindToggleObj.toggleSwitchFrame, {Position = UDim2.new(1, -newWidth - 48 * mobileScaleFactor, 0, yPosition)}, 0.15)
                 end
                 
-                function keybindToggleObj:SetKey(key)
+                function keybindToggleObj:SetKey(key, silent)
                     keybindToggleObj.keyValue = key
                     local keyText = key == Enum.KeyCode.Unknown and "None" or key.Name
                     keybindToggleObj.keyLabelText.Text = keyText
                     updateKeybindSizeYay(keyText)
-                    keybindToggleConfig.ChangedCallback(key)
+                    if not silent then
+                        keybindToggleConfig.ChangedCallback(key)
+                    end
                 end
 
                 function keybindToggleObj:GetKey()
@@ -5525,7 +5535,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     return keybindToggleObj.toggleValue
                 end
                 
-                toggleClickButton.MouseButton1Click:Connect(function() keybindToggleObj:SetToggle(not keybindToggleObj.toggleValue) end)
+                toggleClickButton.MouseButton1Click:Connect(function() keybindToggleObj:SetToggle(not keybindToggleObj.toggleValue, false) end)
                 keybindClickButton.MouseButton1Click:Connect(function()
                     keybindToggleObj.isListening = true
                     keybindToggleObj.keyLabelText.Text = "..."
@@ -5537,7 +5547,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     if keybindToggleObj.isListening then
                         if input.UserInputType == Enum.UserInputType.Keyboard then
                             keybindToggleObj.isListening = false
-                            keybindToggleObj:SetKey(input.KeyCode)
+                            keybindToggleObj:SetKey(input.KeyCode, false)
                             smoothMoveGoWoosh(keybindToggleObj.keybindButtonFrame, {BackgroundColor3 = Color3.fromRGB(32, 32, 32)}, 0.2)
                         end
                     elseif not gameProcessed and input.UserInputType == Enum.UserInputType.Keyboard then
@@ -5550,18 +5560,17 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 keybindClickButton.MouseEnter:Connect(function() if not keybindToggleObj.isListening then smoothMoveGoWoosh(keybindToggleObj.keybindButtonFrame, {BackgroundColor3 = Color3.fromRGB(48, 48, 48)}, 0.2) end end)
                 keybindClickButton.MouseLeave:Connect(function() if not keybindToggleObj.isListening then smoothMoveGoWoosh(keybindToggleObj.keybindButtonFrame, {BackgroundColor3 = Color3.fromRGB(32, 32, 32)}, 0.2) end end)
                 
-                if keybindToggleConfig.ToggleDefault then keybindToggleConfig.ToggleCallback(true) end
                 groupObj.Library:RegisterControl(keybindToggleConfig.Flag, function()
                     return keybindToggleObj:GetKey()
                 end, function(value)
                     if typeof(value) == "EnumItem" and value.EnumType == Enum.KeyCode then
-                        keybindToggleObj:SetKey(value)
+                        keybindToggleObj:SetKey(value, true)
                     end
                 end)
                 groupObj.Library:RegisterControl(keybindToggleConfig.ToggleFlag, function()
                     return keybindToggleObj:GetToggle()
                 end, function(value)
-                    keybindToggleObj:SetToggle(value == true)
+                    keybindToggleObj:SetToggle(value == true, true)
                 end)
                 groupObj.elementYPos = groupObj.elementYPos + 28 * mobileScaleFactor
                 updateGroupSizeYay()
@@ -5796,7 +5805,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     end
                 end)
                 
-                function dropdownObj:Set(value)
+                function dropdownObj:Set(value, silent)
                     if value == nil then return end
                     dropdownObj.value = value
                     local displayValue = tostring(value)
@@ -5805,7 +5814,9 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     dropdownObj.buttonFrame.Size = UDim2.new(0, newWidth, 0, 21 * mobileScaleFactor)
                     dropdownObj.buttonFrame.Position = UDim2.new(1, -newWidth - 10, 0, yPosition)
                     createOptionsYay()
-                    dropdownConfig.Callback(value)
+                    if not silent then
+                        dropdownConfig.Callback(value)
+                    end
                 end
 
                 function dropdownObj:Get()
@@ -5862,7 +5873,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     return dropdownObj:Get()
                 end, function(value)
                     if value ~= nil then
-                        dropdownObj:Set(value)
+                        dropdownObj:Set(value, true)
                     end
                 end)
                 
@@ -6167,7 +6178,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     end
                 end)
                 
-                function multiDropdownObj:Set(values)
+                function multiDropdownObj:Set(values, silent)
                     if type(values) ~= "table" then
                         values = {}
                     end
@@ -6183,7 +6194,9 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     multiDropdownObj.buttonFrame.Size = UDim2.new(0, newWidth, 0, 21 * mobileScaleFactor)
                     multiDropdownObj.buttonFrame.Position = UDim2.new(1, -newWidth - 10, 0, yPosition)
                     createMultiOptionsYay()
-                    multiDropdownConfig.Callback(getSelectedArray())
+                    if not silent then
+                        multiDropdownConfig.Callback(getSelectedArray())
+                    end
                 end
                 
                 function multiDropdownObj:UpdateOptions(newOptions)
@@ -6242,11 +6255,10 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     return multiDropdownObj:Get()
                 end, function(value)
                     if type(value) == "table" then
-                        multiDropdownObj:Set(value)
+                        multiDropdownObj:Set(value, true)
                     end
                 end)
-                
-                if #multiDropdownConfig.Default > 0 then multiDropdownConfig.Callback(getSelectedArray()) end
+
                 groupObj.elementYPos = groupObj.elementYPos + 28 * mobileScaleFactor
                 updateGroupSizeYay()
                 table.insert(groupObj.elementsInGroup, multiDropdownObj)
@@ -6386,7 +6398,6 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     return textInputObj:Get()
                 end, function(value)
                     textInputObj:Set(tostring(value or ""))
-                    textInputConfig.Callback(textInputObj.value, false)
                 end)
                 
                 groupObj.elementYPos = groupObj.elementYPos + 54 * mobileScaleFactor
@@ -6735,14 +6746,16 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     end
                 end)
                 
-                function colorPickerObj:Set(color)
+                function colorPickerObj:Set(color, silent)
                     colorPickerObj.value = color
                     currentH, currentS, currentV = rgbToHsv(color)
                     colorPickerObj.colorPreview.BackgroundColor3 = color
                     colorPickerObj.svBox.BackgroundColor3 = Color3.fromHSV(currentH, 1, 1)
                     colorPickerObj.svCursor.Position = UDim2.new(currentS, -6, 1 - currentV, -6)
                     colorPickerObj.hueCursor.Position = UDim2.new(currentH, -7, 0.5, -7)
-                    colorPickerConfig.Callback(color)
+                    if not silent then
+                        colorPickerConfig.Callback(color)
+                    end
                 end
                 
                 function colorPickerObj:Get() return colorPickerObj.value end
@@ -6754,11 +6767,10 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     return colorPickerObj:Get()
                 end, function(value)
                     if typeof(value) == "Color3" then
-                        colorPickerObj:Set(value)
+                        colorPickerObj:Set(value, true)
                     end
                 end)
-                
-                colorPickerConfig.Callback(colorPickerConfig.Default)
+
                 groupObj.elementYPos = groupObj.elementYPos + 28 * mobileScaleFactor
                 updateGroupSizeYay()
                 table.insert(groupObj.elementsInGroup, colorPickerObj)
