@@ -271,6 +271,8 @@ local function attachFlowUIScrollbar(libraryRef, scrollFrame, parentInstance, op
     local edgeInset = math.max(1, math.floor((options.EdgeInset or (2 * mobileScaleFactor)) + 0.5))
     local verticalInset = math.max(2, math.floor((options.VerticalInset or (4 * mobileScaleFactor)) + 0.5))
     local minThumbHeight = math.max(18, math.floor((options.MinThumbHeight or (26 * mobileScaleFactor)) + 0.5))
+    local idleThumbHeight = math.max(minThumbHeight, math.floor((options.IdleThumbHeight or (42 * mobileScaleFactor)) + 0.5))
+    local alwaysShowTrack = options.AlwaysShowTrack == true
     local zIndex = options.ZIndex or ((scrollFrame.ZIndex or 1) + 2)
 
     local trackFrame = makeThingExist("Frame", {
@@ -314,11 +316,13 @@ local function attachFlowUIScrollbar(libraryRef, scrollFrame, parentInstance, op
 
         local frameSize = scrollFrame.AbsoluteSize
         local windowHeight = frameSize.Y
+        local frameVisible = scrollFrame.Visible and frameSize.X > 0 and frameSize.Y > 0
         local canvasHeight = math.max(resolveCanvasHeight(), windowHeight)
-        local canScroll = scrollFrame.Visible and frameSize.X > 0 and frameSize.Y > 0 and canvasHeight > (windowHeight + 1)
+        local canScroll = frameVisible and canvasHeight > (windowHeight + 1)
 
-        if not canScroll then
+        if not frameVisible then
             trackFrame.Visible = false
+            thumbFrame.Visible = false
             return true
         end
 
@@ -338,6 +342,18 @@ local function attachFlowUIScrollbar(libraryRef, scrollFrame, parentInstance, op
         trackFrame.BackgroundColor3 = Color3.fromRGB(11, 11, 14)
         thumbFrame.BackgroundColor3 = libraryRef.config.AccentColor
 
+        if not canScroll then
+            trackFrame.Visible = alwaysShowTrack
+            thumbFrame.Visible = alwaysShowTrack
+            if alwaysShowTrack then
+                local restingThumbHeight = math.min(idleThumbHeight, trackHeight)
+                thumbFrame.Size = UDim2.fromOffset(thumbWidth, math.floor(restingThumbHeight + 0.5))
+                thumbFrame.Position = UDim2.fromOffset(math.floor(trackWidth * 0.5 + 0.5), math.floor(math.max(0, (trackHeight - restingThumbHeight) * 0.08) + 0.5))
+            end
+            return true
+        end
+
+        thumbFrame.Visible = true
         local minimumThumbHeight = math.min(minThumbHeight, trackHeight)
         local thumbHeight = math.clamp((windowHeight / canvasHeight) * trackHeight, minimumThumbHeight, trackHeight)
         local maxScroll = math.max(canvasHeight - windowHeight, 0)
@@ -4640,6 +4656,8 @@ function superMegaAwesomeLibrary:CreateSection(config)
             ThumbWidth = 3 * mobileScaleFactor,
             EdgeInset = 2 * mobileScaleFactor,
             VerticalInset = 4 * mobileScaleFactor,
+            IdleThumbHeight = 46 * mobileScaleFactor,
+            AlwaysShowTrack = true,
             ZIndex = 6
         })
         --sectionObj.Library:EnableSmoothScrolling(tabObj.contentScroll, 38)
