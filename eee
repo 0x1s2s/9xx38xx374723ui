@@ -3049,29 +3049,27 @@ function superMegaAwesomeLibrary:LoadConfig(fileName)
     local visitedPaths = {}
 
     for _, candidatePath in ipairs(readableCandidates) do
-        if visitedPaths[candidatePath] then
-            continue
-        end
+        if not visitedPaths[candidatePath] then
+            visitedPaths[candidatePath] = true
 
-        visitedPaths[candidatePath] = true
+            local canRead = true
+            if isfile then
+                local okExists, exists = pcall(function()
+                    return isfile(candidatePath)
+                end)
+                canRead = okExists and exists == true
+            end
 
-        local canRead = true
-        if isfile then
-            local okExists, exists = pcall(function()
-                return isfile(candidatePath)
-            end)
-            canRead = okExists and exists == true
-        end
+            if canRead then
+                local okRead, fileData = pcall(function()
+                    return readfile(candidatePath)
+                end)
 
-        if canRead then
-            local okRead, fileData = pcall(function()
-                return readfile(candidatePath)
-            end)
-
-            if okRead and type(fileData) == "string" then
-                path = candidatePath
-                rawConfig = fileData
-                break
+                if okRead and type(fileData) == "string" then
+                    path = candidatePath
+                    rawConfig = fileData
+                    break
+                end
             end
         end
     end
