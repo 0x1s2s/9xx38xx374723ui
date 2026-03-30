@@ -4541,13 +4541,13 @@ function superMegaAwesomeLibrary:CreateSection(config)
     sectionObj.Library = self
     
     sectionObj.containerFrame = makeThingExist("Frame", {
-        BackgroundTransparency = 1, Size = UDim2.new(0, 158 * mobileScaleFactor, 0, 32 * mobileScaleFactor),
+        BackgroundTransparency = 1, Size = UDim2.new(0, 160 * mobileScaleFactor, 0, 34 * mobileScaleFactor),
         ClipsDescendants = true, Parent = self.sectionHolderScroll
     })
     
     sectionObj.mainFrame = makeThingExist("Frame", {
         BackgroundColor3 = Color3.fromRGB(18, 18, 18), Position = UDim2.new(0, 1, 0, 2),
-        Size = UDim2.new(0, 156 * mobileScaleFactor, 0, 28 * mobileScaleFactor), Parent = sectionObj.containerFrame
+        Size = UDim2.new(0, 158 * mobileScaleFactor, 0, 30 * mobileScaleFactor), Parent = sectionObj.containerFrame
     })
     
     local strokeThing = makeThingExist("UIStroke", {Color = Color3.fromRGB(33, 33, 33), Parent = sectionObj.mainFrame})
@@ -4559,36 +4559,36 @@ function superMegaAwesomeLibrary:CreateSection(config)
     
     makeThingExist("ImageLabel", {
         Image = config.Icon, BackgroundTransparency = 1,
-        Position = UDim2.new(0, 10, 0.5, -7 * mobileScaleFactor),
-        Size = UDim2.new(0, 14 * mobileScaleFactor, 0, 14 * mobileScaleFactor), Parent = sectionObj.mainFrame
+        Position = UDim2.new(0, 10, 0.5, -7.5 * mobileScaleFactor),
+        Size = UDim2.new(0, 15 * mobileScaleFactor, 0, 15 * mobileScaleFactor), Parent = sectionObj.mainFrame
     })
     
     makeThingExist("TextLabel", {
         FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
         TextColor3 = Color3.new(1, 1, 1), Text = config.Name, BackgroundTransparency = 1,
-        Position = UDim2.new(0, 32, 0.5, -8.5 * mobileScaleFactor), TextSize = 15 * mobileScaleFactor,
-        Size = UDim2.new(0, 80, 0, 17 * mobileScaleFactor), TextXAlignment = Enum.TextXAlignment.Left,
+        Position = UDim2.new(0, 33, 0.5, -9 * mobileScaleFactor), TextSize = 15.5 * mobileScaleFactor,
+        Size = UDim2.new(0, 84, 0, 18 * mobileScaleFactor), TextXAlignment = Enum.TextXAlignment.Left,
         Parent = sectionObj.mainFrame
     })
     
     local expandButtonImg = makeThingExist("ImageButton", {
         Image = "rbxassetid://111626678408582", BackgroundTransparency = 1,
-        Position = UDim2.new(1, -24, 0.5, -8 * mobileScaleFactor),
-        Size = UDim2.new(0, 16 * mobileScaleFactor, 0, 16 * mobileScaleFactor), Parent = sectionObj.mainFrame
+        Position = UDim2.new(1, -24, 0.5, -8.5 * mobileScaleFactor),
+        Size = UDim2.new(0, 17 * mobileScaleFactor, 0, 17 * mobileScaleFactor), Parent = sectionObj.mainFrame
     })
     
     sectionObj.tabHolderFrame = makeThingExist("Frame", {
-        BackgroundTransparency = 1, Position = UDim2.new(0, 11, 0, 39 * mobileScaleFactor),
-        Size = UDim2.new(0, 146 * mobileScaleFactor, 0, 0), ClipsDescendants = true, Parent = sectionObj.containerFrame
+        BackgroundTransparency = 1, Position = UDim2.new(0, 10, 0, 40 * mobileScaleFactor),
+        Size = UDim2.new(0, 148 * mobileScaleFactor, 0, 0), ClipsDescendants = true, Parent = sectionObj.containerFrame
     })
     
     sectionObj.tabLayoutThing = makeThingExist("UIListLayout", {Padding = UDim.new(0, 5), SortOrder = Enum.SortOrder.LayoutOrder, Parent = sectionObj.tabHolderFrame})
     
     local function updateContainerSizeYay()
         local tabsHeight = sectionObj.tabLayoutThing.AbsoluteContentSize.Y
-        sectionObj.tabHolderFrame.Size = UDim2.new(0, 146 * mobileScaleFactor, 0, tabsHeight)
+        sectionObj.tabHolderFrame.Size = UDim2.new(0, 148 * mobileScaleFactor, 0, tabsHeight)
         if sectionObj.isExpanded then
-            smoothMoveGoWoosh(sectionObj.containerFrame, {Size = UDim2.new(0, 158 * mobileScaleFactor, 0, 32 * mobileScaleFactor + tabsHeight + 9)}, 0.25)
+            smoothMoveGoWoosh(sectionObj.containerFrame, {Size = UDim2.new(0, 160 * mobileScaleFactor, 0, 34 * mobileScaleFactor + tabsHeight + 10)}, 0.25)
         end
     end
     
@@ -4599,9 +4599,9 @@ function superMegaAwesomeLibrary:CreateSection(config)
         smoothMoveGoWoosh(expandButtonImg, {Rotation = sectionObj.isExpanded and 0 or -90}, 0.25)
         if sectionObj.isExpanded then
             local tabsHeight = sectionObj.tabLayoutThing.AbsoluteContentSize.Y
-            smoothMoveGoWoosh(sectionObj.containerFrame, {Size = UDim2.new(0, 158 * mobileScaleFactor, 0, 32 * mobileScaleFactor + tabsHeight + 9)}, 0.25)
+            smoothMoveGoWoosh(sectionObj.containerFrame, {Size = UDim2.new(0, 160 * mobileScaleFactor, 0, 34 * mobileScaleFactor + tabsHeight + 10)}, 0.25)
         else
-            smoothMoveGoWoosh(sectionObj.containerFrame, {Size = UDim2.new(0, 158 * mobileScaleFactor, 0, 32 * mobileScaleFactor)}, 0.25)
+            smoothMoveGoWoosh(sectionObj.containerFrame, {Size = UDim2.new(0, 160 * mobileScaleFactor, 0, 34 * mobileScaleFactor)}, 0.25)
         end
     end))
 
@@ -4618,7 +4618,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
         tabObj.groupPositions = {Left = 0, Right = 0}
         tabObj.isActive = false
         tabObj.Library = sectionObj.Library
-        tabObj.defaultButtonSize = UDim2.new(0, 136 * mobileScaleFactor, 0, 28 * mobileScaleFactor)
+        tabObj.defaultButtonSize = UDim2.new(0, 140 * mobileScaleFactor, 0, 31 * mobileScaleFactor)
         
         tabObj.buttonFrame = makeThingExist("Frame", {
             BackgroundColor3 = sectionObj.Library.config.AccentColor, BackgroundTransparency = 1,
@@ -4628,15 +4628,15 @@ function superMegaAwesomeLibrary:CreateSection(config)
         
         tabObj.iconImg = makeThingExist("ImageLabel", {
             ImageColor3 = Color3.fromRGB(89, 89, 89), Image = tabConfig.Icon, BackgroundTransparency = 1,
-            Position = UDim2.new(0, 9, 0.5, -7 * mobileScaleFactor),
-            Size = UDim2.new(0, 14 * mobileScaleFactor, 0, 14 * mobileScaleFactor), Parent = tabObj.buttonFrame
+            Position = UDim2.new(0, 10, 0.5, -7.5 * mobileScaleFactor),
+            Size = UDim2.new(0, 15 * mobileScaleFactor, 0, 15 * mobileScaleFactor), Parent = tabObj.buttonFrame
         })
         
         tabObj.nameLabel = makeThingExist("TextLabel", {
             FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
             TextColor3 = Color3.fromRGB(89, 89, 89), Text = tabConfig.Name, BackgroundTransparency = 1,
-            Position = UDim2.new(0, 28, 0.5, -8 * mobileScaleFactor), TextSize = 13 * mobileScaleFactor,
-            Size = UDim2.new(0, 105 * mobileScaleFactor, 0, 16 * mobileScaleFactor),
+            Position = UDim2.new(0, 30, 0.5, -8.5 * mobileScaleFactor), TextSize = 13.8 * mobileScaleFactor,
+            Size = UDim2.new(0, 108 * mobileScaleFactor, 0, 17 * mobileScaleFactor),
             TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd,
             ClipsDescendants = true, Parent = tabObj.buttonFrame
         })
@@ -4759,7 +4759,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
             groupObj.elementsInGroup = {}
             groupObj.Library = tabObj.Library
             groupObj.side = groupConfig.Side
-            groupObj.elementYPos = 35 * mobileScaleFactor
+            groupObj.elementYPos = 38 * mobileScaleFactor
             local function createAutoFlag(elementName)
                 return tostring(tabObj.tabNameForSearch) .. "." .. tostring(groupObj.groupNameForSearch) .. "." .. tostring(elementName or "Value")
             end
@@ -4771,11 +4771,11 @@ function superMegaAwesomeLibrary:CreateSection(config)
             end
             
             local parentColumn = groupObj.side == "Left" and tabObj.leftColumnFrame or tabObj.rightColumnFrame
-            local groupWidth = 260 * mobileScaleFactor
+            local groupWidth = 262 * mobileScaleFactor
             
             groupObj.mainFrame = makeThingExist("Frame", {
                 BackgroundColor3 = Color3.fromRGB(18, 18, 18), Position = UDim2.new(0, 1, 0, 1),
-                Size = UDim2.new(0, groupWidth, 0, 50 * mobileScaleFactor),
+                Size = UDim2.new(0, groupWidth, 0, 54 * mobileScaleFactor),
                 ClipsDescendants = true, Parent = parentColumn
             })
             
@@ -4788,19 +4788,19 @@ function superMegaAwesomeLibrary:CreateSection(config)
             
             makeThingExist("ImageLabel", {
                 Image = groupConfig.Icon, BackgroundTransparency = 1, Position = UDim2.new(0, 10, 0, 10 * mobileScaleFactor),
-                Size = UDim2.new(0, 16 * mobileScaleFactor, 0, 16 * mobileScaleFactor), Parent = groupObj.mainFrame
+                Size = UDim2.new(0, 17 * mobileScaleFactor, 0, 17 * mobileScaleFactor), Parent = groupObj.mainFrame
             })
             
             makeThingExist("TextLabel", {
                 FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
                 TextColor3 = Color3.new(1, 1, 1), Text = groupConfig.Name, BackgroundTransparency = 1,
-                Position = UDim2.new(0, 32, 0, 8 * mobileScaleFactor), TextSize = 15 * mobileScaleFactor,
+                Position = UDim2.new(0, 33, 0, 8 * mobileScaleFactor), TextSize = 15.6 * mobileScaleFactor,
                 Size = UDim2.new(0, 215 * mobileScaleFactor, 0, 16 * mobileScaleFactor), TextXAlignment = Enum.TextXAlignment.Left,
                 TextTruncate = Enum.TextTruncate.AtEnd, Parent = groupObj.mainFrame
             })
             
             local function updateGroupSizeYay()
-                local newHeight = groupObj.elementYPos + 10 * mobileScaleFactor
+                local newHeight = groupObj.elementYPos + 12 * mobileScaleFactor
                 groupObj.mainFrame.Size = UDim2.new(0, groupWidth, 0, newHeight)
                 relayoutGroupsYay()
             end
@@ -4820,7 +4820,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 toggleObj.labelText = makeThingExist("TextLabel", {
                     FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
                     TextColor3 = Color3.fromRGB(124, 124, 124), Text = toggleConfig.Name, BackgroundTransparency = 1,
-                    Position = UDim2.new(0, 10, 0, yPosition), TextSize = 14 * mobileScaleFactor,
+                    Position = UDim2.new(0, 10, 0, yPosition), TextSize = 14.6 * mobileScaleFactor,
                     Size = UDim2.new(0, 195 * mobileScaleFactor, 0, 20 * mobileScaleFactor),
                     TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd,
                     Parent = groupObj.mainFrame
@@ -4829,14 +4829,14 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 toggleObj.switchFrame = makeThingExist("Frame", {
                     BackgroundColor3 = toggleObj.value and groupObj.Library.config.AccentColor or Color3.fromRGB(32, 32, 32),
                     Position = UDim2.new(1, -44 * mobileScaleFactor, 0, yPosition),
-                    Size = UDim2.new(0, 34 * mobileScaleFactor, 0, 21 * mobileScaleFactor), Parent = groupObj.mainFrame
+                    Size = UDim2.new(0, 36 * mobileScaleFactor, 0, 22 * mobileScaleFactor), Parent = groupObj.mainFrame
                 })
                 makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = toggleObj.switchFrame})
                 
                 toggleObj.circleFrame = makeThingExist("Frame", {
                     BackgroundColor3 = toggleObj.value and Color3.new(1, 1, 1) or Color3.fromRGB(75, 75, 75),
                     Position = toggleObj.value and UDim2.new(0.462, 0, 0.143, 0) or UDim2.new(0.0104, 0, 0.143, 0),
-                    Size = UDim2.new(0, 15 * mobileScaleFactor, 0, 15 * mobileScaleFactor), Parent = toggleObj.switchFrame
+                    Size = UDim2.new(0, 16 * mobileScaleFactor, 0, 16 * mobileScaleFactor), Parent = toggleObj.switchFrame
                 })
                 makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = toggleObj.circleFrame})
                 
@@ -4914,26 +4914,26 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 local sliderObj = {}
                 sliderObj.value = normalizeSliderValue(sliderConfig.Default, sliderConfig.Min, sliderConfig.Max, sliderConfig.Increment, sliderPrecision)
                 local yPosition = groupObj.elementYPos
-                local sliderWidth = 238 * mobileScaleFactor
+                local sliderWidth = 240 * mobileScaleFactor
                 local valueLabelWidth = 72 * mobileScaleFactor
-                local sliderHitHeight = 18 * mobileScaleFactor
+                local sliderHitHeight = 20 * mobileScaleFactor
                 local sliderTrackHeight = 8 * mobileScaleFactor
-                local sliderKnobWidth = 8 * mobileScaleFactor
-                local sliderKnobHeight = 16 * mobileScaleFactor
+                local sliderKnobWidth = 9 * mobileScaleFactor
+                local sliderKnobHeight = 18 * mobileScaleFactor
                 local sliderKnobHalfWidth = sliderKnobWidth * 0.5
                 
                 sliderObj.labelText = makeThingExist("TextLabel", {
                     FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
                     TextColor3 = Color3.fromRGB(118, 118, 130), Text = sliderConfig.Name, BackgroundTransparency = 1,
-                    Position = UDim2.new(0, 10, 0, yPosition), TextSize = 13.5 * mobileScaleFactor,
-                    Size = UDim2.new(0, sliderWidth - valueLabelWidth - 10 * mobileScaleFactor, 0, 18 * mobileScaleFactor),
+                    Position = UDim2.new(0, 10, 0, yPosition), TextSize = 14.2 * mobileScaleFactor,
+                    Size = UDim2.new(0, sliderWidth - valueLabelWidth - 10 * mobileScaleFactor, 0, 19 * mobileScaleFactor),
                     TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd,
                     Parent = groupObj.mainFrame
                 })
                 
                 sliderObj.backgroundFrame = makeThingExist("Frame", {
                     BackgroundTransparency = 1,
-                    Position = UDim2.new(0, 10, 0, yPosition + 18 * mobileScaleFactor),
+                    Position = UDim2.new(0, 10, 0, yPosition + 20 * mobileScaleFactor),
                     Size = UDim2.new(0, sliderWidth, 0, sliderHitHeight),
                     Parent = groupObj.mainFrame
                 })
@@ -4976,7 +4976,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
                     TextColor3 = Color3.fromRGB(184, 184, 194), Text = formatDisplayValue(sliderObj.value),
                     BackgroundTransparency = 1, Position = UDim2.new(1, -valueLabelWidth - 10 * mobileScaleFactor, 0, yPosition),
-                    TextSize = 13.5 * mobileScaleFactor, Size = UDim2.new(0, valueLabelWidth, 0, 18 * mobileScaleFactor),
+                    TextSize = 14.2 * mobileScaleFactor, Size = UDim2.new(0, valueLabelWidth, 0, 19 * mobileScaleFactor),
                     TextXAlignment = Enum.TextXAlignment.Right, Parent = groupObj.mainFrame
                 })
                 
@@ -5049,7 +5049,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 end, function(value)
                     sliderObj:Set(tonumber(value) or sliderConfig.Min, true, true)
                 end)
-                groupObj.elementYPos = groupObj.elementYPos + 40 * mobileScaleFactor
+                groupObj.elementYPos = groupObj.elementYPos + 44 * mobileScaleFactor
                 updateGroupSizeYay()
                 table.insert(groupObj.elementsInGroup, sliderObj)
                 return sliderObj
@@ -5071,7 +5071,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 buttonObj.mainFrame = makeThingExist("Frame", {
                     BackgroundColor3 = buttonObj.isLocked and Color3.fromRGB(24, 24, 24) or Color3.fromRGB(32, 32, 32),
                     Position = UDim2.new(0, 10, 0, yPosition),
-                    Size = UDim2.new(0, buttonWidth, 0, 26 * mobileScaleFactor), Parent = groupObj.mainFrame
+                    Size = UDim2.new(0, buttonWidth, 0, 28 * mobileScaleFactor), Parent = groupObj.mainFrame
                 })
                 makeThingExist("UICorner", {CornerRadius = UDim.new(0, 6), Parent = buttonObj.mainFrame})
                 
@@ -5107,7 +5107,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 buttonClickButton.MouseEnter:Connect(function() if not buttonObj.isLocked then smoothMoveGoWoosh(buttonObj.mainFrame, {BackgroundColor3 = Color3.fromRGB(40, 40, 40)}, 0.2) end end)
                 buttonClickButton.MouseLeave:Connect(function() if not buttonObj.isLocked then smoothMoveGoWoosh(buttonObj.mainFrame, {BackgroundColor3 = Color3.fromRGB(32, 32, 32)}, 0.2) end end)
                 
-                groupObj.elementYPos = groupObj.elementYPos + 32 * mobileScaleFactor
+                groupObj.elementYPos = groupObj.elementYPos + 35 * mobileScaleFactor
                 updateGroupSizeYay()
                 table.insert(groupObj.elementsInGroup, buttonObj)
                 return buttonObj
@@ -5137,7 +5137,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 keybindObj.labelText = makeThingExist("TextLabel", {
                     FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
                     TextColor3 = Color3.fromRGB(124, 124, 124), Text = keybindConfig.Name, BackgroundTransparency = 1,
-                    Position = UDim2.new(0, 10, 0, yPosition), TextSize = 14 * mobileScaleFactor,
+                    Position = UDim2.new(0, 10, 0, yPosition), TextSize = 14.6 * mobileScaleFactor,
                     Size = UDim2.new(0, 145 * mobileScaleFactor, 0, 20 * mobileScaleFactor),
                     TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd,
                     Parent = groupObj.mainFrame
@@ -5156,7 +5156,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 
                 keybindObj.buttonFrame = makeThingExist("Frame", {
                     BackgroundColor3 = Color3.fromRGB(32, 32, 32), Position = UDim2.new(1, -keyWidth - 10, 0, yPosition),
-                    Size = UDim2.new(0, keyWidth, 0, 21 * mobileScaleFactor), Active = true, Parent = groupObj.mainFrame
+                    Size = UDim2.new(0, keyWidth, 0, 22 * mobileScaleFactor), Active = true, Parent = groupObj.mainFrame
                 })
                 makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = keybindObj.buttonFrame})
                 
@@ -5169,7 +5169,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 keybindObj.keyLabelText = makeThingExist("TextLabel", {
                     FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
                     TextColor3 = Color3.fromRGB(113, 113, 113), Text = keyText, BackgroundTransparency = 1,
-                    Position = UDim2.new(0, 2, 0, 0), TextSize = 12 * mobileScaleFactor,
+                    Position = UDim2.new(0, 2, 0, 0), TextSize = 12.8 * mobileScaleFactor,
                     Size = UDim2.new(1, -24 * mobileScaleFactor, 1, 0), TextXAlignment = Enum.TextXAlignment.Left,
                     Parent = keybindObj.buttonFrame
                 })
@@ -5177,8 +5177,8 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 
                 keybindObj.keyboardIconImg = makeThingExist("ImageLabel", {
                     ImageColor3 = Color3.fromRGB(76, 76, 76), Image = "rbxassetid://10723416765", BackgroundTransparency = 1,
-                    Position = UDim2.new(1, -18 * mobileScaleFactor, 0.5, -7 * mobileScaleFactor),
-                    Size = UDim2.new(0, 14 * mobileScaleFactor, 0, 14 * mobileScaleFactor), Parent = keybindObj.buttonFrame
+                    Position = UDim2.new(1, -18 * mobileScaleFactor, 0.5, -7.5 * mobileScaleFactor),
+                    Size = UDim2.new(0, 15 * mobileScaleFactor, 0, 15 * mobileScaleFactor), Parent = keybindObj.buttonFrame
                 })
                 
                 local keybindClickButton = makeThingExist("TextButton", {Text = "", BackgroundTransparency = 1, Size = UDim2.new(1, 0, 1, 0), Active = true, Parent = keybindObj.buttonFrame})
@@ -5271,7 +5271,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 
                 local function updateKeybindSizeYay(text)
                     local newWidth = math.max(48 * mobileScaleFactor, howWideIsThisText(text, 12 * mobileScaleFactor) + 30 * mobileScaleFactor)
-                    smoothMoveGoWoosh(keybindObj.buttonFrame, {Size = UDim2.new(0, newWidth, 0, 21 * mobileScaleFactor), Position = UDim2.new(1, -newWidth - 10, 0, yPosition)}, 0.15)
+                    smoothMoveGoWoosh(keybindObj.buttonFrame, {Size = UDim2.new(0, newWidth, 0, 22 * mobileScaleFactor), Position = UDim2.new(1, -newWidth - 10, 0, yPosition)}, 0.15)
                 end
                 
                 local function updateModeVisuals()
@@ -5559,7 +5559,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 keybindToggleObj.labelText = makeThingExist("TextLabel", {
                     FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
                     TextColor3 = Color3.fromRGB(124, 124, 124), Text = keybindToggleConfig.Name, BackgroundTransparency = 1,
-                    Position = UDim2.new(0, 10, 0, yPosition), TextSize = 14 * mobileScaleFactor,
+                    Position = UDim2.new(0, 10, 0, yPosition), TextSize = 14.6 * mobileScaleFactor,
                     Size = UDim2.new(0, 115 * mobileScaleFactor, 0, 20 * mobileScaleFactor),
                     TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd,
                     Parent = groupObj.mainFrame
@@ -5570,7 +5570,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 
                 keybindToggleObj.keybindButtonFrame = makeThingExist("Frame", {
                     BackgroundColor3 = Color3.fromRGB(32, 32, 32), Position = UDim2.new(1, -keyWidth - 10, 0, yPosition),
-                    Size = UDim2.new(0, keyWidth, 0, 21 * mobileScaleFactor), Parent = groupObj.mainFrame
+                    Size = UDim2.new(0, keyWidth, 0, 22 * mobileScaleFactor), Parent = groupObj.mainFrame
                 })
                 makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = keybindToggleObj.keybindButtonFrame})
                 
@@ -5579,28 +5579,28 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 keybindToggleObj.keyLabelText = makeThingExist("TextLabel", {
                     FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
                     TextColor3 = Color3.fromRGB(113, 113, 113), Text = keyText, BackgroundTransparency = 1,
-                    Position = UDim2.new(0, 6, 0, 0), TextSize = 12 * mobileScaleFactor,
+                    Position = UDim2.new(0, 6, 0, 0), TextSize = 12.8 * mobileScaleFactor,
                     Size = UDim2.new(1, -24 * mobileScaleFactor, 1, 0), TextXAlignment = Enum.TextXAlignment.Left,
                     Parent = keybindToggleObj.keybindButtonFrame
                 })
                 
                 keybindToggleObj.keyboardIconImg = makeThingExist("ImageLabel", {
                     ImageColor3 = Color3.fromRGB(76, 76, 76), Image = "rbxassetid://10723416765", BackgroundTransparency = 1,
-                    Position = UDim2.new(1, -18 * mobileScaleFactor, 0.5, -7 * mobileScaleFactor),
-                    Size = UDim2.new(0, 14 * mobileScaleFactor, 0, 14 * mobileScaleFactor), Parent = keybindToggleObj.keybindButtonFrame
+                    Position = UDim2.new(1, -18 * mobileScaleFactor, 0.5, -7.5 * mobileScaleFactor),
+                    Size = UDim2.new(0, 15 * mobileScaleFactor, 0, 15 * mobileScaleFactor), Parent = keybindToggleObj.keybindButtonFrame
                 })
                 
                 keybindToggleObj.toggleSwitchFrame = makeThingExist("Frame", {
                     BackgroundColor3 = keybindToggleObj.toggleValue and groupObj.Library.config.AccentColor or Color3.fromRGB(32, 32, 32),
                     Position = UDim2.new(1, -keyWidth - 48 * mobileScaleFactor, 0, yPosition),
-                    Size = UDim2.new(0, 34 * mobileScaleFactor, 0, 21 * mobileScaleFactor), Parent = groupObj.mainFrame
+                    Size = UDim2.new(0, 36 * mobileScaleFactor, 0, 22 * mobileScaleFactor), Parent = groupObj.mainFrame
                 })
                 makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = keybindToggleObj.toggleSwitchFrame})
                 
                 keybindToggleObj.toggleCircleFrame = makeThingExist("Frame", {
                     BackgroundColor3 = keybindToggleObj.toggleValue and Color3.new(1, 1, 1) or Color3.fromRGB(75, 75, 75),
                     Position = keybindToggleObj.toggleValue and UDim2.new(0.462, 0, 0.143, 0) or UDim2.new(0.0104, 0, 0.143, 0),
-                    Size = UDim2.new(0, 15 * mobileScaleFactor, 0, 15 * mobileScaleFactor), Parent = keybindToggleObj.toggleSwitchFrame
+                    Size = UDim2.new(0, 16 * mobileScaleFactor, 0, 16 * mobileScaleFactor), Parent = keybindToggleObj.toggleSwitchFrame
                 })
                 makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = keybindToggleObj.toggleCircleFrame})
                 
@@ -5623,7 +5623,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 
                 local function updateKeybindSizeYay(text)
                     local newWidth = math.max(48 * mobileScaleFactor, howWideIsThisText(text, 12 * mobileScaleFactor) + 30 * mobileScaleFactor)
-                    smoothMoveGoWoosh(keybindToggleObj.keybindButtonFrame, {Size = UDim2.new(0, newWidth, 0, 21 * mobileScaleFactor), Position = UDim2.new(1, -newWidth - 10, 0, yPosition)}, 0.15)
+                    smoothMoveGoWoosh(keybindToggleObj.keybindButtonFrame, {Size = UDim2.new(0, newWidth, 0, 22 * mobileScaleFactor), Position = UDim2.new(1, -newWidth - 10, 0, yPosition)}, 0.15)
                     smoothMoveGoWoosh(keybindToggleObj.toggleSwitchFrame, {Position = UDim2.new(1, -newWidth - 48 * mobileScaleFactor, 0, yPosition)}, 0.15)
                 end
                 
@@ -5682,7 +5682,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 end, function(value)
                     keybindToggleObj:SetToggle(value == true, true)
                 end)
-                groupObj.elementYPos = groupObj.elementYPos + 28 * mobileScaleFactor
+                groupObj.elementYPos = groupObj.elementYPos + 31 * mobileScaleFactor
                 updateGroupSizeYay()
                 table.insert(groupObj.elementsInGroup, keybindToggleObj)
                 return keybindToggleObj
@@ -5731,7 +5731,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 dropdownObj.labelText = makeThingExist("TextLabel", {
                     FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
                     TextColor3 = Color3.fromRGB(124, 124, 124), Text = dropdownConfig.Name, BackgroundTransparency = 1,
-                    Position = UDim2.new(0, 10, 0, yPosition), TextSize = 13 * mobileScaleFactor,
+                    Position = UDim2.new(0, 10, 0, yPosition), TextSize = 13.8 * mobileScaleFactor,
                     Size = UDim2.new(0, 130 * mobileScaleFactor, 0, 20 * mobileScaleFactor),
                     TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd, Parent = groupObj.mainFrame
                 })
@@ -5741,7 +5741,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 
                 dropdownObj.buttonFrame = makeThingExist("Frame", {
                     BackgroundColor3 = Color3.fromRGB(32, 32, 32), Position = UDim2.new(1, -buttonWidth - 10, 0, yPosition),
-                    Size = UDim2.new(0, buttonWidth, 0, 21 * mobileScaleFactor), Parent = groupObj.mainFrame
+                    Size = UDim2.new(0, buttonWidth, 0, 23 * mobileScaleFactor), Parent = groupObj.mainFrame
                 })
                 makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = dropdownObj.buttonFrame})
                 
@@ -5750,15 +5750,15 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 dropdownObj.selectedLabelText = makeThingExist("TextLabel", {
                     FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
                     TextColor3 = Color3.fromRGB(84, 84, 84), Text = displayText, BackgroundTransparency = 1,
-                    Position = UDim2.new(0, 8, 0, 0), TextSize = 12 * mobileScaleFactor,
+                    Position = UDim2.new(0, 8, 0, 0), TextSize = 12.8 * mobileScaleFactor,
                     Size = UDim2.new(1, -28 * mobileScaleFactor, 1, 0), TextXAlignment = Enum.TextXAlignment.Left,
                     TextTruncate = Enum.TextTruncate.AtEnd, Parent = dropdownObj.buttonFrame
                 })
                 
                 dropdownObj.arrowImg = makeThingExist("ImageLabel", {
                     ImageColor3 = Color3.fromRGB(80, 80, 80), Image = "rbxassetid://111626678408582", BackgroundTransparency = 1,
-                    Position = UDim2.new(1, -20 * mobileScaleFactor, 0.5, -7 * mobileScaleFactor),
-                    Size = UDim2.new(0, 14 * mobileScaleFactor, 0, 14 * mobileScaleFactor), Parent = dropdownObj.buttonFrame
+                    Position = UDim2.new(1, -20 * mobileScaleFactor, 0.5, -7.5 * mobileScaleFactor),
+                    Size = UDim2.new(0, 15 * mobileScaleFactor, 0, 15 * mobileScaleFactor), Parent = dropdownObj.buttonFrame
                 })
                 
                 dropdownObj.optionHolderFrame = makeThingExist("Frame", {
@@ -6383,7 +6383,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     end
                 end)
 
-                groupObj.elementYPos = groupObj.elementYPos + 28 * mobileScaleFactor
+                groupObj.elementYPos = groupObj.elementYPos + 31 * mobileScaleFactor
                 updateGroupSizeYay()
                 table.insert(groupObj.elementsInGroup, multiDropdownObj)
                 return multiDropdownObj
@@ -6454,15 +6454,15 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 textInputObj.labelText = makeThingExist("TextLabel", {
                     FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
                     TextColor3 = Color3.fromRGB(124, 124, 124), Text = textInputConfig.Name, BackgroundTransparency = 1,
-                    Position = UDim2.new(0, 10, 0, yPosition), TextSize = 14 * mobileScaleFactor,
+                    Position = UDim2.new(0, 10, 0, yPosition), TextSize = 14.6 * mobileScaleFactor,
                     Size = UDim2.new(0, 80 * mobileScaleFactor, 0, 20 * mobileScaleFactor),
                     TextXAlignment = Enum.TextXAlignment.Left, Parent = groupObj.mainFrame
                 })
                 
                 textInputObj.inputFrame = makeThingExist("Frame", {
                     BackgroundColor3 = Color3.fromRGB(32, 32, 32),
-                    Position = UDim2.new(0, 10, 0, yPosition + 22 * mobileScaleFactor),
-                    Size = UDim2.new(0, 238 * mobileScaleFactor, 0, 26 * mobileScaleFactor),
+                    Position = UDim2.new(0, 10, 0, yPosition + 23 * mobileScaleFactor),
+                    Size = UDim2.new(0, 240 * mobileScaleFactor, 0, 28 * mobileScaleFactor),
                     Parent = groupObj.mainFrame
                 })
                 makeThingExist("UICorner", {CornerRadius = UDim.new(0, 6), Parent = textInputObj.inputFrame})
@@ -6474,7 +6474,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     PlaceholderColor3 = Color3.fromRGB(80, 80, 80),
                     Text = textInputConfig.Default,
                     TextColor3 = Color3.fromRGB(200, 200, 200),
-                    TextSize = 13 * mobileScaleFactor,
+                    TextSize = 13.8 * mobileScaleFactor,
                     BackgroundTransparency = 1,
                     ClearTextOnFocus = false,
                     Position = UDim2.new(0, 8, 0, 0),
@@ -6524,7 +6524,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     textInputObj:Set(tostring(value or ""))
                 end)
                 
-                groupObj.elementYPos = groupObj.elementYPos + 54 * mobileScaleFactor
+                groupObj.elementYPos = groupObj.elementYPos + 58 * mobileScaleFactor
                 updateGroupSizeYay()
                 table.insert(groupObj.elementsInGroup, textInputObj)
                 return textInputObj
@@ -6895,7 +6895,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     end
                 end)
 
-                groupObj.elementYPos = groupObj.elementYPos + 28 * mobileScaleFactor
+                groupObj.elementYPos = groupObj.elementYPos + 31 * mobileScaleFactor
                 updateGroupSizeYay()
                 table.insert(groupObj.elementsInGroup, colorPickerObj)
                 return colorPickerObj
@@ -6914,7 +6914,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
         task.defer(function()
             local tabsHeight = sectionObj.tabLayoutThing.AbsoluteContentSize.Y
             sectionObj.tabHolderFrame.Size = UDim2.new(0, 146 * mobileScaleFactor, 0, tabsHeight)
-            sectionObj.containerFrame.Size = UDim2.new(0, 158 * mobileScaleFactor, 0, 32 * mobileScaleFactor + tabsHeight + 9)
+            sectionObj.containerFrame.Size = UDim2.new(0, 160 * mobileScaleFactor, 0, 34 * mobileScaleFactor + tabsHeight + 10)
         end)
         
         if sectionObj.Library._searchQuery ~= "" then
