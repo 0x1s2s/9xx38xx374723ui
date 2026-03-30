@@ -770,6 +770,9 @@ function superMegaAwesomeLibrary.new(config)
     self._textGradientAnimationTime = 0
     self._gradientAnimationAccumulator = 0
     self._overlayUpdateAccumulator = 0
+    self._watermarkUpdateAccumulator = 0
+    self._watermarkLastWidth = 0
+    self._refreshJobs = {}
     self._notificationTimestamps = {}
     self._uiVisualSettings = {
         Blur = false,
@@ -850,8 +853,14 @@ function superMegaAwesomeLibrary:_TrackConnection(conn)
         if #self._connections % 100 == 0 then
             local activeConnections = {}
             for _, item in ipairs(self._connections) do
-                if item and typeof(item) == "RBXScriptConnection" and item.Connected then
-                    table.insert(activeConnections, item)
+                if item then
+                    if typeof(item) == "RBXScriptConnection" then
+                        if item.Connected then
+                            table.insert(activeConnections, item)
+                        end
+                    else
+                        table.insert(activeConnections, item)
+                    end
                 end
             end
             self._connections = activeConnections
@@ -868,6 +877,54 @@ function superMegaAwesomeLibrary:RegisterControl(flag, getter, setter)
         set = setter
     }
     self._lastControlRegistration = os.clock()
+end
+
+function superMegaAwesomeLibrary:_RegisterRefreshJob(interval, isAliveFn, stepFn)
+    if type(stepFn) ~= "function" then
+        return nil
+    end
+
+    local job = {
+        Interval = math.max(tonumber(interval) or 0.5, 0.05),
+        IsAlive = isAliveFn,
+        Step = stepFn,
+        Accumulator = 0
+    }
+
+    table.insert(self._refreshJobs, job)
+    return job
+end
+
+function superMegaAwesomeLibrary:_StepRefreshJobs(dt)
+    if not self._refreshJobs then
+        return
+    end
+
+    local resolvedDt = tonumber(dt) or 0
+    for index = #self._refreshJobs, 1, -1 do
+        local job = self._refreshJobs[index]
+        local keepJob = true
+
+        if type(job) ~= "table" or type(job.Step) ~= "function" then
+            keepJob = false
+        elseif type(job.IsAlive) == "function" then
+            local okAlive, isAlive = pcall(job.IsAlive)
+            keepJob = okAlive and isAlive ~= false
+        end
+
+        if not keepJob then
+            table.remove(self._refreshJobs, index)
+        else
+            job.Accumulator = (job.Accumulator or 0) + resolvedDt
+            if job.Accumulator >= (job.Interval or 0.5) then
+                job.Accumulator = 0
+                local okStep, keepResult = pcall(job.Step)
+                if not okStep or keepResult == false then
+                    table.remove(self._refreshJobs, index)
+                end
+            end
+        end
+    end
 end
 
 function superMegaAwesomeLibrary:_BuildAutoConfigSnapshot()
@@ -3224,6 +3281,8 @@ function superMegaAwesomeLibrary:CreateUIBecauseWeNeedIt()
         if self._uiVisualSettings.ESPSelfPreview or self._espPreviewWasShowing then
             self:_UpdateESPPreview(dt)
         end
+        self:_StepRefreshJobs(dt)
+        self:_UpdateWatermark(dt)
         if self._uiVisualSettings.TextGradient and #self._gradientObjects > 0 then
             self:_AnimateTextGradients(dt)
         end
@@ -3563,26 +3622,31 @@ function superMegaAwesomeLibrary:CreateWatermarkBecauseWeCool()
     table.insert(self._gradientLabels, self.watermarkTextLabel)
     
     makeDraggableCuzWeCan(self.watermarkFrame, nil, self)
-    
-    local lastWatermarkWidth = 0
-    task.spawn(function()
-        while not self._destroyed do
-            task.wait(0.6)
-            if self.watermarkFrame and self.watermarkFrame.Parent and self.watermarkTextLabel and self.watermarkTextLabel.Parent then
-                local timeNow = os.date("%H:%M:%S")
-                local fpsCount = self._latestFPSValue > 0 and self._latestFPSValue or 0
-                local newText = self.config.Name .. " | " .. timeNow .. " | " .. fpsCount .. " FPS"
-                if self.watermarkTextLabel.Text ~= newText then
-                    self.watermarkTextLabel.Text = newText
-                end
-                local newWidth = howWideIsThisText(newText, 14 * mobileScaleFactor, Enum.Font.GothamSemibold) + 45
-                if math.abs(newWidth - lastWatermarkWidth) > 1 then
-                    lastWatermarkWidth = newWidth
-                    smoothMoveGoWoosh(self.watermarkFrame, {Size = UDim2.new(0, newWidth, 0, 36 * mobileScaleFactor)}, 0.18)
-                end
-            end
-        end
-    end)
+end
+
+function superMegaAwesomeLibrary:_UpdateWatermark(dt)
+    if not (self.watermarkFrame and self.watermarkFrame.Parent and self.watermarkTextLabel and self.watermarkTextLabel.Parent) then
+        return
+    end
+
+    self._watermarkUpdateAccumulator = (self._watermarkUpdateAccumulator or 0) + (tonumber(dt) or 0)
+    if self._watermarkUpdateAccumulator < 0.6 then
+        return
+    end
+    self._watermarkUpdateAccumulator = 0
+
+    local timeNow = os.date("%H:%M:%S")
+    local fpsCount = self._latestFPSValue > 0 and self._latestFPSValue or 0
+    local newText = self.config.Name .. " | " .. timeNow .. " | " .. fpsCount .. " FPS"
+    if self.watermarkTextLabel.Text ~= newText then
+        self.watermarkTextLabel.Text = newText
+    end
+
+    local newWidth = howWideIsThisText(newText, 14 * mobileScaleFactor, Enum.Font.GothamSemibold) + 45
+    if math.abs(newWidth - (self._watermarkLastWidth or 0)) > 1 then
+        self._watermarkLastWidth = newWidth
+        smoothMoveGoWoosh(self.watermarkFrame, {Size = UDim2.new(0, newWidth, 0, 36 * mobileScaleFactor)}, 0.18)
+    end
 end
 
 function superMegaAwesomeLibrary:CreateMainFrameYay()
@@ -5965,21 +6029,21 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 end
 
                 if dropdownConfig.AutoRefresh then
-                    task.spawn(function()
-                        while not groupObj.Library._destroyed and dropdownObj.buttonFrame and dropdownObj.buttonFrame.Parent do
-                            local latestOptions = dropdownOptionsSource
-                            if type(dropdownConfig.OptionsProvider) == "function" then
-                                local ok, providedOptions = pcall(dropdownConfig.OptionsProvider)
-                                if ok and type(providedOptions) == "table" then
-                                    latestOptions = providedOptions
-                                end
+                    groupObj.Library:_RegisterRefreshJob(dropdownConfig.RefreshInterval, function()
+                        return not groupObj.Library._destroyed and dropdownObj.buttonFrame and dropdownObj.buttonFrame.Parent
+                    end, function()
+                        local latestOptions = dropdownOptionsSource
+                        if type(dropdownConfig.OptionsProvider) == "function" then
+                            local ok, providedOptions = pcall(dropdownConfig.OptionsProvider)
+                            if ok and type(providedOptions) == "table" then
+                                latestOptions = providedOptions
                             end
-                            local latestSignature = getDropdownOptionsSignature(latestOptions)
-                            if latestSignature ~= dropdownObj._optionsSignature then
-                                dropdownObj:UpdateOptions(latestOptions)
-                            end
-                            task.wait(dropdownConfig.RefreshInterval)
                         end
+                        local latestSignature = getDropdownOptionsSignature(latestOptions)
+                        if latestSignature ~= dropdownObj._optionsSignature then
+                            dropdownObj:UpdateOptions(latestOptions)
+                        end
+                        return true
                     end)
                 end
 
@@ -6352,21 +6416,21 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 end
 
                 if multiDropdownConfig.AutoRefresh then
-                    task.spawn(function()
-                        while not groupObj.Library._destroyed and multiDropdownObj.buttonFrame and multiDropdownObj.buttonFrame.Parent do
-                            local latestOptions = multiDropdownOptionsSource
-                            if type(multiDropdownConfig.OptionsProvider) == "function" then
-                                local ok, providedOptions = pcall(multiDropdownConfig.OptionsProvider)
-                                if ok and type(providedOptions) == "table" then
-                                    latestOptions = providedOptions
-                                end
+                    groupObj.Library:_RegisterRefreshJob(multiDropdownConfig.RefreshInterval, function()
+                        return not groupObj.Library._destroyed and multiDropdownObj.buttonFrame and multiDropdownObj.buttonFrame.Parent
+                    end, function()
+                        local latestOptions = multiDropdownOptionsSource
+                        if type(multiDropdownConfig.OptionsProvider) == "function" then
+                            local ok, providedOptions = pcall(multiDropdownConfig.OptionsProvider)
+                            if ok and type(providedOptions) == "table" then
+                                latestOptions = providedOptions
                             end
-                            local latestSignature = getDropdownOptionsSignature(latestOptions)
-                            if latestSignature ~= multiDropdownObj._optionsSignature then
-                                multiDropdownObj:UpdateOptions(latestOptions)
-                            end
-                            task.wait(multiDropdownConfig.RefreshInterval)
                         end
+                        local latestSignature = getDropdownOptionsSignature(latestOptions)
+                        if latestSignature ~= multiDropdownObj._optionsSignature then
+                            multiDropdownObj:UpdateOptions(latestOptions)
+                        end
+                        return true
                     end)
                 end
                 
@@ -6913,7 +6977,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
         
         task.defer(function()
             local tabsHeight = sectionObj.tabLayoutThing.AbsoluteContentSize.Y
-            sectionObj.tabHolderFrame.Size = UDim2.new(0, 146 * mobileScaleFactor, 0, tabsHeight)
+            sectionObj.tabHolderFrame.Size = UDim2.new(0, 148 * mobileScaleFactor, 0, tabsHeight)
             sectionObj.containerFrame.Size = UDim2.new(0, 160 * mobileScaleFactor, 0, 34 * mobileScaleFactor + tabsHeight + 10)
         end)
         
@@ -7006,18 +7070,12 @@ function superMegaAwesomeLibrary:Destroy()
     end
 
     for i = #self._connections, 1, -1 do
-        local conn = self._connections[i]
-        if conn and typeof(conn) == "RBXScriptConnection" then
-            pcall(function()
-                if conn.Connected then
-                    conn:Disconnect()
-                end
-            end)
-        end
+        disconnectFlowConnection(self._connections[i])
         self._connections[i] = nil
     end
 
     self._smoothScrollFrames = {}
+    self._refreshJobs = {}
     self._trackedControls = {}
     self:_ClearSnowflakes()
     self:_DestroyESPPreviewCharacter()
@@ -7049,6 +7107,8 @@ function superMegaAwesomeLibrary:Destroy()
     self._gradientAnimationAccumulator = 0
     self._backgroundFxAccumulator = 0
     self._overlayUpdateAccumulator = 0
+    self._watermarkUpdateAccumulator = 0
+    self._watermarkLastWidth = 0
     self._snowSpawnAccumulator = 0
     self._gradientObjects = {}
     self._espPreviewProjectionCache = nil
