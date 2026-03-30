@@ -259,6 +259,130 @@ local function startFloatingPositionTracker(libraryRef, anchorInstance, updateFn
     end
 end
 
+local function attachFlowUIScrollbar(libraryRef, scrollFrame, parentInstance, options)
+    if not libraryRef or not scrollFrame or not parentInstance then
+        return nil
+    end
+
+    options = options or {}
+
+    local trackWidth = math.max(4, math.floor((options.TrackWidth or (6 * mobileScaleFactor)) + 0.5))
+    local thumbWidth = math.max(2, math.min(trackWidth - 1, math.floor((options.ThumbWidth or (3 * mobileScaleFactor)) + 0.5)))
+    local edgeInset = math.max(1, math.floor((options.EdgeInset or (2 * mobileScaleFactor)) + 0.5))
+    local verticalInset = math.max(2, math.floor((options.VerticalInset or (4 * mobileScaleFactor)) + 0.5))
+    local minThumbHeight = math.max(18, math.floor((options.MinThumbHeight or (26 * mobileScaleFactor)) + 0.5))
+    local zIndex = options.ZIndex or ((scrollFrame.ZIndex or 1) + 2)
+
+    local trackFrame = makeThingExist("Frame", {
+        Name = "FlowUIScrollbarTrack",
+        BackgroundColor3 = Color3.fromRGB(11, 11, 14),
+        BackgroundTransparency = 0.12,
+        BorderSizePixel = 0,
+        Visible = false,
+        ZIndex = zIndex,
+        Parent = parentInstance
+    })
+    makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = trackFrame})
+
+    local thumbFrame = makeThingExist("Frame", {
+        Name = "FlowUIScrollbarThumb",
+        AnchorPoint = Vector2.new(0.5, 0),
+        BackgroundColor3 = libraryRef.config.AccentColor,
+        BorderSizePixel = 0,
+        Position = UDim2.new(0.5, 0, 0, 0),
+        Size = UDim2.new(0, thumbWidth, 0, minThumbHeight),
+        ZIndex = zIndex + 1,
+        Parent = trackFrame
+    })
+    makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = thumbFrame})
+
+    local function resolveCanvasHeight()
+        local canvasHeight = math.max(scrollFrame.CanvasSize.Y.Offset, 0)
+        local okAbsoluteCanvas, absoluteCanvasSize = pcall(function()
+            return scrollFrame.AbsoluteCanvasSize
+        end)
+        if okAbsoluteCanvas and typeof(absoluteCanvasSize) == "Vector2" then
+            canvasHeight = math.max(canvasHeight, absoluteCanvasSize.Y)
+        end
+        return canvasHeight
+    end
+
+    local function updateScrollbar()
+        if libraryRef._destroyed or not scrollFrame.Parent or not parentInstance.Parent or not trackFrame.Parent then
+            return false
+        end
+
+        local frameSize = scrollFrame.AbsoluteSize
+        local windowHeight = frameSize.Y
+        local canvasHeight = math.max(resolveCanvasHeight(), windowHeight)
+        local canScroll = scrollFrame.Visible and frameSize.X > 0 and frameSize.Y > 0 and canvasHeight > (windowHeight + 1)
+
+        if not canScroll then
+            trackFrame.Visible = false
+            return true
+        end
+
+        local parentAbsolute = parentInstance.AbsolutePosition
+        local frameAbsolute = scrollFrame.AbsolutePosition
+        local trackHeight = math.max(0, frameSize.Y - (verticalInset * 2))
+        if trackHeight <= 2 then
+            trackFrame.Visible = false
+            return true
+        end
+        local trackX = math.floor((frameAbsolute.X - parentAbsolute.X) + frameSize.X - trackWidth - edgeInset + 0.5)
+        local trackY = math.floor((frameAbsolute.Y - parentAbsolute.Y) + verticalInset + 0.5)
+
+        trackFrame.Visible = true
+        trackFrame.Position = UDim2.fromOffset(trackX, trackY)
+        trackFrame.Size = UDim2.fromOffset(trackWidth, math.floor(trackHeight + 0.5))
+        trackFrame.BackgroundColor3 = Color3.fromRGB(11, 11, 14)
+        thumbFrame.BackgroundColor3 = libraryRef.config.AccentColor
+
+        local minimumThumbHeight = math.min(minThumbHeight, trackHeight)
+        local thumbHeight = math.clamp((windowHeight / canvasHeight) * trackHeight, minimumThumbHeight, trackHeight)
+        local maxScroll = math.max(canvasHeight - windowHeight, 0)
+        local scrollRatio = maxScroll > 0 and math.clamp(scrollFrame.CanvasPosition.Y / maxScroll, 0, 1) or 0
+        local thumbTravel = math.max(trackHeight - thumbHeight, 0)
+
+        thumbFrame.Size = UDim2.fromOffset(thumbWidth, math.floor(thumbHeight + 0.5))
+        thumbFrame.Position = UDim2.fromOffset(math.floor(trackWidth * 0.5 + 0.5), math.floor((thumbTravel * scrollRatio) + 0.5))
+
+        return true
+    end
+
+    local function bindProperty(propertyName)
+        local okSignal, signal = pcall(function()
+            return scrollFrame:GetPropertyChangedSignal(propertyName)
+        end)
+        if okSignal and signal then
+            libraryRef:_TrackConnection(signal:Connect(updateScrollbar))
+        end
+    end
+
+    bindProperty("CanvasPosition")
+    bindProperty("CanvasSize")
+    bindProperty("AbsoluteSize")
+    bindProperty("AbsoluteCanvasSize")
+    bindProperty("Visible")
+
+    local stopFloatingTracker = startFloatingPositionTracker(libraryRef, scrollFrame, updateScrollbar)
+    if stopFloatingTracker then
+        libraryRef:_TrackConnection(stopFloatingTracker)
+    end
+
+    if type(libraryRef._scrollbarRefreshers) == "table" then
+        table.insert(libraryRef._scrollbarRefreshers, updateScrollbar)
+    end
+
+    updateScrollbar()
+
+    return {
+        Track = trackFrame,
+        Thumb = thumbFrame,
+        Refresh = updateScrollbar
+    }
+end
+
 local function getPlayerAvatarCuzTheyreBeautiful(userId)
     local didItWork, whatWeGot = pcall(function()
         return playersAreNoobs:GetUserThumbnailAsync(userId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
@@ -607,6 +731,7 @@ function superMegaAwesomeLibrary.new(config)
     self._isApplyingConfig = false
     self._configPathHints = {}
     self._smoothScrollFrames = {}
+    self._scrollbarRefreshers = {}
     self._searchQuery = ""
     self._fpsRollingSize = 60
     self._fpsRollingWindow = table.create and table.create(self._fpsRollingSize, 0) or {}
@@ -1204,6 +1329,15 @@ function superMegaAwesomeLibrary:_RefreshAccentCore()
     end
     if self.currentTabYay and self.currentTabYay.buttonFrame then
         self.currentTabYay.buttonFrame.BackgroundColor3 = accent
+    end
+    if self._scrollbarRefreshers then
+        for index = #self._scrollbarRefreshers, 1, -1 do
+            local refresher = self._scrollbarRefreshers[index]
+            local okRefresh, keepRefresher = pcall(refresher)
+            if not okRefresh or keepRefresher == false then
+                table.remove(self._scrollbarRefreshers, index)
+            end
+        end
     end
     self:_SetTextGradientEnabled(self._uiVisualSettings.TextGradient)
 end
@@ -3604,6 +3738,13 @@ function superMegaAwesomeLibrary:CreateMainFrameYay()
         ScrollBarThickness = 0, CanvasSize = UDim2.new(0, 0, 0, 0),
         AutomaticCanvasSize = Enum.AutomaticSize.Y, ClipsDescendants = true, Parent = self.mainFrameYay
     })
+    attachFlowUIScrollbar(self, self.sectionHolderScroll, self.mainFrameYay, {
+        TrackWidth = 7 * mobileScaleFactor,
+        ThumbWidth = 3 * mobileScaleFactor,
+        EdgeInset = 3 * mobileScaleFactor,
+        VerticalInset = 5 * mobileScaleFactor,
+        ZIndex = 6
+    })
     
     makeThingExist("UIPadding", {PaddingLeft = UDim.new(0, 2), PaddingRight = UDim.new(0, 2), PaddingTop = UDim.new(0, 2), Parent = self.sectionHolderScroll})
     self.sectionLayoutThing = makeThingExist("UIListLayout", {Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder, Parent = self.sectionHolderScroll})
@@ -4493,6 +4634,13 @@ function superMegaAwesomeLibrary:CreateSection(config)
             Size = UDim2.new(1, -8, 1, -8), ScrollBarThickness = 0,
             CanvasSize = UDim2.new(0, 540 * mobileScaleFactor, 0, 0), Visible = false,
             Parent = sectionObj.Library.contentHolderFrame
+        })
+        attachFlowUIScrollbar(sectionObj.Library, tabObj.contentScroll, sectionObj.Library.contentHolderFrame, {
+            TrackWidth = 7 * mobileScaleFactor,
+            ThumbWidth = 3 * mobileScaleFactor,
+            EdgeInset = 2 * mobileScaleFactor,
+            VerticalInset = 4 * mobileScaleFactor,
+            ZIndex = 6
         })
         --sectionObj.Library:EnableSmoothScrolling(tabObj.contentScroll, 38)
         
@@ -5624,9 +5772,16 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 
                 dropdownObj.optionScrollFrame = makeThingExist("ScrollingFrame", {
                     BackgroundTransparency = 1, Position = UDim2.new(0, 0, 0, 30 * mobileScaleFactor),
-                    Size = UDim2.new(1, 0, 1, -35 * mobileScaleFactor), ScrollBarThickness = 3,
+                    Size = UDim2.new(1, 0, 1, -35 * mobileScaleFactor), ScrollBarThickness = 0,
                     ScrollBarImageColor3 = Color3.fromRGB(80, 80, 80), CanvasSize = UDim2.new(0, 0, 0, 0),
                     ZIndex = 10000, Parent = dropdownObj.optionHolderFrame
+                })
+                attachFlowUIScrollbar(groupObj.Library, dropdownObj.optionScrollFrame, dropdownObj.optionHolderFrame, {
+                    TrackWidth = 7 * mobileScaleFactor,
+                    ThumbWidth = 3 * mobileScaleFactor,
+                    EdgeInset = 2 * mobileScaleFactor,
+                    VerticalInset = 4 * mobileScaleFactor,
+                    ZIndex = 10002
                 })
                 dropdownObj.optionScrollFrame:SetAttribute("FlowDisableSmoothScroll", true)
                 --groupObj.Library:EnableSmoothScrolling(dropdownObj.optionScrollFrame, 22)
@@ -5956,9 +6111,16 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 
                 multiDropdownObj.optionScrollFrame = makeThingExist("ScrollingFrame", {
                     BackgroundTransparency = 1, Position = UDim2.new(0, 0, 0, 30 * mobileScaleFactor),
-                    Size = UDim2.new(1, 0, 1, -35 * mobileScaleFactor), ScrollBarThickness = 3,
+                    Size = UDim2.new(1, 0, 1, -35 * mobileScaleFactor), ScrollBarThickness = 0,
                     ScrollBarImageColor3 = Color3.fromRGB(80, 80, 80), CanvasSize = UDim2.new(0, 0, 0, 0),
                     ZIndex = 10000, Parent = multiDropdownObj.optionHolderFrame
+                })
+                attachFlowUIScrollbar(groupObj.Library, multiDropdownObj.optionScrollFrame, multiDropdownObj.optionHolderFrame, {
+                    TrackWidth = 7 * mobileScaleFactor,
+                    ThumbWidth = 3 * mobileScaleFactor,
+                    EdgeInset = 2 * mobileScaleFactor,
+                    VerticalInset = 4 * mobileScaleFactor,
+                    ZIndex = 10002
                 })
                 multiDropdownObj.optionScrollFrame:SetAttribute("FlowDisableSmoothScroll", true)
                 --groupObj.Library:EnableSmoothScrolling(multiDropdownObj.optionScrollFrame, 22)
