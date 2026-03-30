@@ -495,7 +495,80 @@ local function getReadableFlowUIConfigPaths(configName)
     }
 end
 
+local flowUIRuntimeInstanceKey = "__FLOW_UI_ACTIVE_LIBRARY"
+local flowUIScreenGuiName = "v0rtexdBestUIEver"
+
+local function getFlowUISharedEnvironment()
+    if type(getgenv) == "function" then
+        local okEnv, sharedEnv = pcall(getgenv)
+        if okEnv and type(sharedEnv) == "table" then
+            return sharedEnv
+        end
+    end
+    return _G
+end
+
+local function destroyExistingFlowUIScreenGuis()
+    local roots = {}
+    local seenRoots = {}
+
+    local function addRoot(root)
+        if not root or seenRoots[root] then
+            return
+        end
+        seenRoots[root] = true
+        table.insert(roots, root)
+    end
+
+    addRoot(coreGuiMoreLikeBoreGui)
+
+    if type(gethui) == "function" then
+        local okHui, huiRoot = pcall(gethui)
+        if okHui then
+            addRoot(huiRoot)
+        end
+    end
+
+    if theOneAndOnlyPlayer then
+        local okPlayerGui, playerGui = pcall(function()
+            return theOneAndOnlyPlayer:FindFirstChild("PlayerGui")
+        end)
+        if okPlayerGui then
+            addRoot(playerGui)
+        end
+    end
+
+    for _, root in ipairs(roots) do
+        local okChildren, children = pcall(function()
+            return root:GetChildren()
+        end)
+        if okChildren and type(children) == "table" then
+            for _, child in ipairs(children) do
+                if child and child:IsA("ScreenGui") and child.Name == flowUIScreenGuiName then
+                    pcall(function()
+                        child:Destroy()
+                    end)
+                end
+            end
+        end
+    end
+end
+
+local function cleanupPreviousFlowUIInstance()
+    local sharedEnv = getFlowUISharedEnvironment()
+    local previousInstance = rawget(sharedEnv, flowUIRuntimeInstanceKey)
+    if previousInstance and type(previousInstance) == "table" and type(previousInstance.Destroy) == "function" then
+        pcall(function()
+            previousInstance:Destroy()
+        end)
+    end
+    rawset(sharedEnv, flowUIRuntimeInstanceKey, nil)
+    destroyExistingFlowUIScreenGuis()
+end
+
 function superMegaAwesomeLibrary.new(config)
+    cleanupPreviousFlowUIInstance()
+
     local self = setmetatable({}, superMegaAwesomeLibrary)
     
     self.config = config or {}
@@ -556,6 +629,7 @@ function superMegaAwesomeLibrary.new(config)
     self._textGradientAnimationTime = 0
     self._gradientAnimationAccumulator = 0
     self._overlayUpdateAccumulator = 0
+    self._notificationTimestamps = {}
     self._uiVisualSettings = {
         Blur = false,
         Snow = false,
@@ -624,6 +698,7 @@ function superMegaAwesomeLibrary.new(config)
     self._espPreviewRotateLastX = 0
     
     self:CreateUIBecauseWeNeedIt()
+    rawset(getFlowUISharedEnvironment(), flowUIRuntimeInstanceKey, self)
     
     return self
 end
@@ -4089,6 +4164,18 @@ function superMegaAwesomeLibrary:Notify(config)
     config.Duration = tonumber(config.Duration) or 3
     config.Duration = math.max(0.8, config.Duration)
     config.Icon = config.Icon or "rbxassetid://10747361219"
+
+    if self._destroyed or self._isApplyingConfig then
+        return nil
+    end
+
+    local notificationKey = config.Title .. "\31" .. config.Description
+    local nowClock = os.clock()
+    local lastNotificationAt = self._notificationTimestamps[notificationKey]
+    if lastNotificationAt and (nowClock - lastNotificationAt) < 0.85 then
+        return nil
+    end
+    self._notificationTimestamps[notificationKey] = nowClock
     
     local hasDescription = normalizeSearchText(config.Description) ~= ""
     local titleBounds = textServiceBeLikeText:GetTextSize(
@@ -4233,6 +4320,14 @@ function superMegaAwesomeLibrary:Notify(config)
         TweenInfo.new(config.Duration, Enum.EasingStyle.Linear, Enum.EasingDirection.Out),
         {Size = UDim2.new(0, 0, 1, 0)}
     )
+
+    table.insert(self.notificationsAreCool, notificationFrame)
+    while #self.notificationsAreCool > 5 do
+        local oldestNotification = table.remove(self.notificationsAreCool, 1)
+        if oldestNotification and oldestNotification.Parent then
+            oldestNotification:Destroy()
+        end
+    end
     
     task.defer(function()
         if not notificationFrame or not notificationFrame.Parent then return end
@@ -4262,6 +4357,12 @@ function superMegaAwesomeLibrary:Notify(config)
             task.wait(0.4)
             if notificationFrame and notificationFrame.Parent then
                 notificationFrame:Destroy()
+            end
+        end
+        for index = #self.notificationsAreCool, 1, -1 do
+            if self.notificationsAreCool[index] == notificationFrame then
+                table.remove(self.notificationsAreCool, index)
+                break
             end
         end
     end)
@@ -4637,17 +4738,17 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 sliderObj.value = normalizeSliderValue(sliderConfig.Default, sliderConfig.Min, sliderConfig.Max, sliderConfig.Increment, sliderPrecision)
                 local yPosition = groupObj.elementYPos
                 local sliderWidth = 238 * mobileScaleFactor
-                local valueBadgeWidth = 76 * mobileScaleFactor
-                local sliderTrackHeight = 14 * mobileScaleFactor
-                local sliderTrackInset = 2 * mobileScaleFactor
-                local sliderTrackInnerHeight = 8 * mobileScaleFactor
+                local valueBadgeWidth = 74 * mobileScaleFactor
+                local sliderTrackHeight = 16 * mobileScaleFactor
+                local sliderTrackInset = 3 * mobileScaleFactor
+                local sliderTrackInnerHeight = 6 * mobileScaleFactor
                 local sliderTrackInnerWidth = sliderWidth - sliderTrackInset * 2
-                local sliderKnobSize = 14 * mobileScaleFactor
+                local sliderKnobSize = 12 * mobileScaleFactor
                 local sliderKnobHalf = sliderKnobSize * 0.5
                 
                 sliderObj.labelText = makeThingExist("TextLabel", {
                     FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
-                    TextColor3 = Color3.fromRGB(150, 150, 150), Text = sliderConfig.Name, BackgroundTransparency = 1,
+                    TextColor3 = Color3.fromRGB(154, 154, 160), Text = sliderConfig.Name, BackgroundTransparency = 1,
                     Position = UDim2.new(0, 10, 0, yPosition), TextSize = 14 * mobileScaleFactor,
                     Size = UDim2.new(0, sliderWidth - valueBadgeWidth - 8 * mobileScaleFactor, 0, 20 * mobileScaleFactor),
                     TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd,
@@ -4655,7 +4756,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 })
                 
                 sliderObj.valueBadgeFrame = makeThingExist("Frame", {
-                    BackgroundColor3 = Color3.fromRGB(24, 24, 26),
+                    BackgroundColor3 = Color3.fromRGB(20, 20, 22),
                     BorderSizePixel = 0,
                     Position = UDim2.new(1, -valueBadgeWidth - 10 * mobileScaleFactor, 0, yPosition + 1 * mobileScaleFactor),
                     Size = UDim2.new(0, valueBadgeWidth, 0, 18 * mobileScaleFactor),
@@ -4663,13 +4764,13 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 })
                 makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = sliderObj.valueBadgeFrame})
                 sliderObj.valueBadgeStroke = makeThingExist("UIStroke", {
-                    Color = Color3.fromRGB(39, 39, 42),
+                    Color = Color3.fromRGB(32, 32, 35),
                     Thickness = 1,
                     Parent = sliderObj.valueBadgeFrame
                 })
 
                 sliderObj.backgroundFrame = makeThingExist("Frame", {
-                    BackgroundColor3 = Color3.fromRGB(18, 18, 20),
+                    BackgroundColor3 = Color3.fromRGB(20, 20, 22),
                     BorderSizePixel = 0,
                     Position = UDim2.new(0, 10, 0, yPosition + 23 * mobileScaleFactor),
                     Size = UDim2.new(0, sliderWidth, 0, sliderTrackHeight),
@@ -4677,28 +4778,19 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 })
                 makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = sliderObj.backgroundFrame})
                 sliderObj.trackStroke = makeThingExist("UIStroke", {
-                    Color = Color3.fromRGB(39, 39, 42),
+                    Color = Color3.fromRGB(32, 32, 35),
                     Thickness = 1,
                     Parent = sliderObj.backgroundFrame
                 })
 
-                sliderObj.trackInner = makeThingExist("Frame", {
-                    BackgroundColor3 = Color3.fromRGB(31, 31, 34),
+                sliderObj.trackFrame = makeThingExist("Frame", {
+                    BackgroundColor3 = Color3.fromRGB(28, 28, 31),
                     BorderSizePixel = 0,
                     Position = UDim2.new(0, sliderTrackInset, 0.5, -sliderTrackInnerHeight * 0.5),
                     Size = UDim2.new(0, sliderTrackInnerWidth, 0, sliderTrackInnerHeight),
                     Parent = sliderObj.backgroundFrame
                 })
-                makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = sliderObj.trackInner})
-
-                sliderObj.trackShine = makeThingExist("Frame", {
-                    BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-                    BackgroundTransparency = 0.92,
-                    BorderSizePixel = 0,
-                    Size = UDim2.new(1, 0, 0, math.max(1, math.floor(sliderTrackInnerHeight * 0.35))),
-                    Parent = sliderObj.trackInner
-                })
-                makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = sliderObj.trackShine})
+                makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = sliderObj.trackFrame})
                 
                 local percentage = getSliderPercentage(sliderObj.value)
                 sliderObj.fillFrame = makeThingExist("Frame", {
@@ -4709,28 +4801,20 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     Parent = sliderObj.backgroundFrame
                 })
                 makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = sliderObj.fillFrame})
-                sliderObj.fillShine = makeThingExist("Frame", {
-                    BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+
+                sliderObj.knobGlow = makeThingExist("Frame", {
+                    BackgroundColor3 = groupObj.Library.config.AccentColor,
                     BackgroundTransparency = 0.82,
                     BorderSizePixel = 0,
-                    Size = UDim2.new(1, 0, 0, math.max(1, math.floor(sliderTrackInnerHeight * 0.4))),
-                    Parent = sliderObj.fillFrame
-                })
-                makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = sliderObj.fillShine})
-
-                sliderObj.knobGlow = makeThingExist("ImageLabel", {
-                    BackgroundTransparency = 1,
-                    Image = "rbxassetid://5028857084",
-                    ImageColor3 = groupObj.Library.config.AccentColor,
-                    ImageTransparency = 0.76,
                     AnchorPoint = Vector2.new(0.5, 0.5),
                     Position = UDim2.new(0, math.clamp(sliderTrackInset + sliderTrackInnerWidth * percentage, sliderKnobHalf, sliderWidth - sliderKnobHalf), 0.5, 0),
-                    Size = UDim2.new(0, sliderKnobSize + 12 * mobileScaleFactor, 0, sliderKnobSize + 12 * mobileScaleFactor),
-                    ZIndex = 0,
+                    Size = UDim2.new(0, sliderKnobSize + 6 * mobileScaleFactor, 0, sliderKnobSize + 6 * mobileScaleFactor),
+                    ZIndex = 1,
                     Parent = sliderObj.backgroundFrame
                 })
+                makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = sliderObj.knobGlow})
                 sliderObj.knobFrame = makeThingExist("Frame", {
-                    BackgroundColor3 = Color3.fromRGB(246, 248, 255),
+                    BackgroundColor3 = Color3.fromRGB(18, 18, 20),
                     BorderSizePixel = 0,
                     AnchorPoint = Vector2.new(0.5, 0.5),
                     Position = UDim2.new(0, math.clamp(sliderTrackInset + sliderTrackInnerWidth * percentage, sliderKnobHalf, sliderWidth - sliderKnobHalf), 0.5, 0),
@@ -4740,7 +4824,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 })
                 makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = sliderObj.knobFrame})
                 sliderObj.knobStroke = makeThingExist("UIStroke", {
-                    Color = groupObj.Library.config.AccentColor:Lerp(Color3.new(1, 1, 1), 0.55),
+                    Color = groupObj.Library.config.AccentColor:Lerp(Color3.fromRGB(26, 26, 28), 0.2),
                     Thickness = 1.1,
                     Parent = sliderObj.knobFrame
                 })
@@ -4756,7 +4840,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 
                 sliderObj.valueLabelText = makeThingExist("TextLabel", {
                     FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
-                    TextColor3 = Color3.fromRGB(184, 184, 190), Text = formatValue(sliderObj.value) .. " / " .. formatValue(sliderConfig.Max),
+                    TextColor3 = Color3.fromRGB(162, 162, 168), Text = formatValue(sliderObj.value) .. " / " .. formatValue(sliderConfig.Max),
                     BackgroundTransparency = 1, Position = UDim2.new(0, 0, 0, 0),
                     TextSize = 12.5 * mobileScaleFactor, Size = UDim2.new(1, -10 * mobileScaleFactor, 1, 0),
                     TextXAlignment = Enum.TextXAlignment.Right, Parent = sliderObj.valueBadgeFrame
@@ -4772,9 +4856,9 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     local knobTarget = {Position = UDim2.new(0, knobX, 0.5, 0)}
 
                     if animate then
-                        smoothMoveGoWoosh(sliderObj.fillFrame, fillTarget, 0.12)
-                        smoothMoveGoWoosh(sliderObj.knobFrame, knobTarget, 0.12, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-                        smoothMoveGoWoosh(sliderObj.knobGlow, knobTarget, 0.12, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+                        smoothMoveGoWoosh(sliderObj.fillFrame, fillTarget, 0.14)
+                        smoothMoveGoWoosh(sliderObj.knobFrame, knobTarget, 0.14, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+                        smoothMoveGoWoosh(sliderObj.knobGlow, knobTarget, 0.14, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
                     else
                         sliderObj.fillFrame.Size = fillTarget.Size
                         sliderObj.knobFrame.Position = knobTarget.Position
@@ -4783,7 +4867,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
 
                     sliderObj.valueLabelText.Text = formatValue(sliderObj.value) .. " / " .. formatValue(sliderConfig.Max)
                 end
-                
+
                 function sliderObj:Set(value, instant)
                     value = normalizeSliderValue(value, sliderConfig.Min, sliderConfig.Max, sliderConfig.Increment, sliderPrecision)
                     sliderObj.value = value
@@ -4815,29 +4899,29 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     isDraggingSlider = true
                     activeSliderInput = isTouch and input or nil
                     setSliderFromInput(input, true)
-                    smoothMoveGoWoosh(sliderObj.trackStroke, {Color = groupObj.Library.config.AccentColor:Lerp(Color3.new(1, 1, 1), 0.55)}, 0.12)
-                    smoothMoveGoWoosh(sliderObj.valueBadgeStroke, {Color = groupObj.Library.config.AccentColor:Lerp(Color3.fromRGB(32, 32, 34), 0.45)}, 0.12)
-                    smoothMoveGoWoosh(sliderObj.knobGlow, {ImageTransparency = 0.66}, 0.12)
+                    smoothMoveGoWoosh(sliderObj.trackStroke, {Color = groupObj.Library.config.AccentColor:Lerp(Color3.fromRGB(18, 18, 20), 0.35)}, 0.12)
+                    smoothMoveGoWoosh(sliderObj.valueBadgeStroke, {Color = groupObj.Library.config.AccentColor:Lerp(Color3.fromRGB(18, 18, 20), 0.42)}, 0.12)
+                    smoothMoveGoWoosh(sliderObj.knobGlow, {BackgroundTransparency = 0.7}, 0.12)
                 end)
                 sliderClickButton.MouseEnter:Connect(function()
                     if isDraggingSlider then
                         return
                     end
-                    smoothMoveGoWoosh(sliderObj.trackStroke, {Color = Color3.fromRGB(52, 52, 56)}, 0.12)
+                    smoothMoveGoWoosh(sliderObj.trackStroke, {Color = Color3.fromRGB(42, 42, 46)}, 0.12)
                 end)
                 sliderClickButton.MouseLeave:Connect(function()
                     if isDraggingSlider then
                         return
                     end
-                    smoothMoveGoWoosh(sliderObj.trackStroke, {Color = Color3.fromRGB(39, 39, 42)}, 0.12)
+                    smoothMoveGoWoosh(sliderObj.trackStroke, {Color = Color3.fromRGB(32, 32, 35)}, 0.12)
                 end)
                 groupObj.Library:_TrackConnection(thisInputServiceGoesHard.InputEnded:Connect(function(input)
                     if input.UserInputType == Enum.UserInputType.MouseButton1 or (input.UserInputType == Enum.UserInputType.Touch and (activeSliderInput == nil or input == activeSliderInput)) then
                         isDraggingSlider = false
                         activeSliderInput = nil
-                        smoothMoveGoWoosh(sliderObj.trackStroke, {Color = Color3.fromRGB(39, 39, 42)}, 0.12)
-                        smoothMoveGoWoosh(sliderObj.valueBadgeStroke, {Color = Color3.fromRGB(39, 39, 42)}, 0.12)
-                        smoothMoveGoWoosh(sliderObj.knobGlow, {ImageTransparency = 0.76}, 0.12)
+                        smoothMoveGoWoosh(sliderObj.trackStroke, {Color = Color3.fromRGB(32, 32, 35)}, 0.12)
+                        smoothMoveGoWoosh(sliderObj.valueBadgeStroke, {Color = Color3.fromRGB(32, 32, 35)}, 0.12)
+                        smoothMoveGoWoosh(sliderObj.knobGlow, {BackgroundTransparency = 0.82}, 0.12)
                     end
                 end))
                 groupObj.Library:_TrackConnection(thisInputServiceGoesHard.InputChanged:Connect(function(input)
@@ -5490,7 +5574,12 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 dropdownConfig.Name = dropdownConfig.Name or "Dropdown"
                 dropdownConfig.Options = dropdownConfig.Options or {"Option 1", "Option 2", "Option 3"}
                 dropdownConfig.OptionsProvider = dropdownConfig.OptionsProvider or dropdownConfig.GetOptions
-                dropdownConfig.AutoRefresh = dropdownConfig.AutoRefresh ~= false
+                local dropdownHasProvider = type(dropdownConfig.OptionsProvider) == "function"
+                if dropdownConfig.AutoRefresh == nil then
+                    dropdownConfig.AutoRefresh = dropdownHasProvider
+                else
+                    dropdownConfig.AutoRefresh = dropdownConfig.AutoRefresh == true
+                end
                 dropdownConfig.RefreshInterval = math.max(tonumber(dropdownConfig.RefreshInterval) or 0.85, 0.35)
                 dropdownConfig.Callback = dropdownConfig.Callback or function() end
                 dropdownConfig.Flag = dropdownConfig.Flag or createAutoFlag(dropdownConfig.Name)
@@ -5788,7 +5877,12 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 multiDropdownConfig.Name = multiDropdownConfig.Name or "Multi Dropdown"
                 multiDropdownConfig.Options = multiDropdownConfig.Options or {"Option 1", "Option 2", "Option 3"}
                 multiDropdownConfig.OptionsProvider = multiDropdownConfig.OptionsProvider or multiDropdownConfig.GetOptions
-                multiDropdownConfig.AutoRefresh = multiDropdownConfig.AutoRefresh ~= false
+                local multiDropdownHasProvider = type(multiDropdownConfig.OptionsProvider) == "function"
+                if multiDropdownConfig.AutoRefresh == nil then
+                    multiDropdownConfig.AutoRefresh = multiDropdownHasProvider
+                else
+                    multiDropdownConfig.AutoRefresh = multiDropdownConfig.AutoRefresh == true
+                end
                 multiDropdownConfig.RefreshInterval = math.max(tonumber(multiDropdownConfig.RefreshInterval) or 0.85, 0.35)
                 multiDropdownConfig.Default = multiDropdownConfig.Default or {}
                 multiDropdownConfig.Callback = multiDropdownConfig.Callback or function() end
@@ -6721,10 +6815,10 @@ function superMegaAwesomeLibrary:SetAccentColor(color)
                             element.knobCore.BackgroundColor3 = color
                         end
                         if element.knobGlow then
-                            element.knobGlow.ImageColor3 = color
+                            element.knobGlow.BackgroundColor3 = color
                         end
                         if element.knobStroke then
-                            element.knobStroke.Color = color:Lerp(Color3.new(1, 1, 1), 0.55)
+                            element.knobStroke.Color = color:Lerp(Color3.fromRGB(26, 26, 28), 0.2)
                         end
                         if element.toggleSwitchFrame and element.toggleValue == true then
                             element.toggleSwitchFrame.BackgroundColor3 = color
@@ -6851,6 +6945,11 @@ function superMegaAwesomeLibrary:Destroy()
 
     if self.screenGuiYay and self.screenGuiYay.Parent then
         self.screenGuiYay:Destroy()
+    end
+
+    local sharedEnv = getFlowUISharedEnvironment()
+    if rawget(sharedEnv, flowUIRuntimeInstanceKey) == self then
+        rawset(sharedEnv, flowUIRuntimeInstanceKey, nil)
     end
 end
 
