@@ -4108,8 +4108,8 @@ function superMegaAwesomeLibrary:CreateMainFrameYay()
     })
     
     makeThingExist("UIPadding", {
-        PaddingLeft = UDim.new(0, 2),
-        PaddingRight = UDim.new(0, 2),
+        PaddingLeft = UDim.new(0, 4 * mobileScaleFactor),
+        PaddingRight = UDim.new(0, 4 * mobileScaleFactor),
         PaddingTop = UDim.new(0, 2),
         PaddingBottom = UDim.new(0, 8 * mobileScaleFactor),
         Parent = self.sectionHolderScroll
@@ -4123,6 +4123,7 @@ function superMegaAwesomeLibrary:CreateMainFrameYay()
         ClipsDescendants = true, Parent = self.mainFrameYay
     })
     self.contentWidth = contentWidth
+    self.sectionScrollWidth = sectionScrollWidth
 
     local settingsPanelWidth = 185 * mobileScaleFactor
     local settingsPanelHeight = math.min(292 * mobileScaleFactor, frameHeight - 50)
@@ -4896,16 +4897,24 @@ function superMegaAwesomeLibrary:CreateSection(config)
     sectionObj.isExpanded = true
     sectionObj.Library = self
     
+    local ssw = sectionObj.Library.sectionScrollWidth or (162 * mobileScaleFactor)
+    local containerWidth = ssw - 8 * mobileScaleFactor
+    local mainFrameWidth = ssw - 12 * mobileScaleFactor
+    local tabHolderWidth = ssw - 20 * mobileScaleFactor
+    local sectionLabelWidth = math.max(20, mainFrameWidth - 59)
+    sectionObj.containerWidth = containerWidth
+    sectionObj.tabHolderWidth = tabHolderWidth
+    
     sectionObj.containerFrame = makeThingExist("Frame", {
-        BackgroundTransparency = 1, Size = UDim2.new(0, 160 * mobileScaleFactor, 0, 34 * mobileScaleFactor),
+        BackgroundTransparency = 1, Size = UDim2.new(0, containerWidth, 0, 34 * mobileScaleFactor),
         ClipsDescendants = true, Parent = self.sectionHolderScroll
     })
     
     sectionObj.mainFrame = makeFlowUISurfaceFrame(
         sectionObj.containerFrame,
         flowUIPalette.Surface,
-        UDim2.new(0, 1, 0, 2),
-        UDim2.new(0, 158 * mobileScaleFactor, 0, 30 * mobileScaleFactor),
+        UDim2.new(0, 2 * mobileScaleFactor, 0, 2 * mobileScaleFactor),
+        UDim2.new(0, mainFrameWidth, 0, 30 * mobileScaleFactor),
         {
             CornerRadius = UDim.new(0, 8),
             StrokeColor = flowUIPalette.Stroke,
@@ -4926,7 +4935,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
         sectionObj.Library,
         config.Name,
         UDim2.new(0, 33, 0.5, -9 * mobileScaleFactor),
-        UDim2.new(0, 84, 0, 18 * mobileScaleFactor),
+        UDim2.new(0, sectionLabelWidth, 0, 18 * mobileScaleFactor),
         {
             TextColor = getFlowUITextColor(sectionObj.Library),
             TextSize = 15.5 * mobileScaleFactor
@@ -4940,17 +4949,17 @@ function superMegaAwesomeLibrary:CreateSection(config)
     })
     
     sectionObj.tabHolderFrame = makeThingExist("Frame", {
-        BackgroundTransparency = 1, Position = UDim2.new(0, 10, 0, 40 * mobileScaleFactor),
-        Size = UDim2.new(0, 148 * mobileScaleFactor, 0, 0), ClipsDescendants = true, Parent = sectionObj.containerFrame
+        BackgroundTransparency = 1, Position = UDim2.new(0, 6 * mobileScaleFactor, 0, 40 * mobileScaleFactor),
+        Size = UDim2.new(0, tabHolderWidth, 0, 0), ClipsDescendants = true, Parent = sectionObj.containerFrame
     })
     
     sectionObj.tabLayoutThing = makeThingExist("UIListLayout", {Padding = UDim.new(0, 5), SortOrder = Enum.SortOrder.LayoutOrder, Parent = sectionObj.tabHolderFrame})
     
     local function updateContainerSizeYay()
         local tabsHeight = sectionObj.tabLayoutThing.AbsoluteContentSize.Y
-        sectionObj.tabHolderFrame.Size = UDim2.new(0, 148 * mobileScaleFactor, 0, tabsHeight)
+        sectionObj.tabHolderFrame.Size = UDim2.new(0, tabHolderWidth, 0, tabsHeight)
         if sectionObj.isExpanded then
-            smoothMoveGoWoosh(sectionObj.containerFrame, {Size = UDim2.new(0, 160 * mobileScaleFactor, 0, 34 * mobileScaleFactor + tabsHeight + 10)}, 0.25)
+            smoothMoveGoWoosh(sectionObj.containerFrame, {Size = UDim2.new(0, containerWidth, 0, 34 * mobileScaleFactor + tabsHeight + 10)}, 0.25)
         end
     end
     
@@ -4961,9 +4970,9 @@ function superMegaAwesomeLibrary:CreateSection(config)
         smoothMoveGoWoosh(expandButtonImg, {Rotation = sectionObj.isExpanded and 0 or -90}, 0.25)
         if sectionObj.isExpanded then
             local tabsHeight = sectionObj.tabLayoutThing.AbsoluteContentSize.Y
-            smoothMoveGoWoosh(sectionObj.containerFrame, {Size = UDim2.new(0, 160 * mobileScaleFactor, 0, 34 * mobileScaleFactor + tabsHeight + 10)}, 0.25)
+            smoothMoveGoWoosh(sectionObj.containerFrame, {Size = UDim2.new(0, containerWidth, 0, 34 * mobileScaleFactor + tabsHeight + 10)}, 0.25)
         else
-            smoothMoveGoWoosh(sectionObj.containerFrame, {Size = UDim2.new(0, 160 * mobileScaleFactor, 0, 34 * mobileScaleFactor)}, 0.25)
+            smoothMoveGoWoosh(sectionObj.containerFrame, {Size = UDim2.new(0, containerWidth, 0, 34 * mobileScaleFactor)}, 0.25)
         end
     end))
 
@@ -4980,7 +4989,10 @@ function superMegaAwesomeLibrary:CreateSection(config)
         tabObj.groupPositions = {Left = 0, Right = 0}
         tabObj.isActive = false
         tabObj.Library = sectionObj.Library
-        tabObj.defaultButtonSize = UDim2.new(0, 140 * mobileScaleFactor, 0, 31 * mobileScaleFactor)
+        local tabSsw = sectionObj.Library.sectionScrollWidth or (162 * mobileScaleFactor)
+        local tabButtonWidth = math.max(80, tabSsw - 28 * mobileScaleFactor)
+        local tabLabelWidth = math.max(20, tabButtonWidth - 34)
+        tabObj.defaultButtonSize = UDim2.new(0, tabButtonWidth, 0, 31 * mobileScaleFactor)
         
         tabObj.buttonFrame = makeFlowUISurfaceFrame(
             sectionObj.tabHolderFrame,
@@ -5007,7 +5019,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
             sectionObj.Library,
             tabConfig.Name,
             UDim2.new(0, 30, 0.5, -8.5 * mobileScaleFactor),
-            UDim2.new(0, 108 * mobileScaleFactor, 0, 17 * mobileScaleFactor),
+            UDim2.new(0, tabLabelWidth, 0, 17 * mobileScaleFactor),
             {
                 TextColor = getFlowUISubTextColor(sectionObj.Library):Lerp(flowUIPalette.TextSoft, 0.45),
                 TextSize = 13.8 * mobileScaleFactor,
@@ -7436,8 +7448,11 @@ function superMegaAwesomeLibrary:CreateSection(config)
         
         task.defer(function()
             local tabsHeight = sectionObj.tabLayoutThing.AbsoluteContentSize.Y
-            sectionObj.tabHolderFrame.Size = UDim2.new(0, 148 * mobileScaleFactor, 0, tabsHeight)
-            sectionObj.containerFrame.Size = UDim2.new(0, 160 * mobileScaleFactor, 0, 34 * mobileScaleFactor + tabsHeight + 10)
+            local fallbackSsw = sectionObj.Library.sectionScrollWidth or (162 * mobileScaleFactor)
+            local thw = sectionObj.tabHolderWidth or (fallbackSsw - 20 * mobileScaleFactor)
+            local cw = sectionObj.containerWidth or (fallbackSsw - 8 * mobileScaleFactor)
+            sectionObj.tabHolderFrame.Size = UDim2.new(0, thw, 0, tabsHeight)
+            sectionObj.containerFrame.Size = UDim2.new(0, cw, 0, 34 * mobileScaleFactor + tabsHeight + 10)
         end)
         
         if sectionObj.Library._searchQuery ~= "" then
