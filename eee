@@ -272,6 +272,28 @@ local function makeDraggableCuzWeCan(frame, handle, libraryRef)
         end
     end
     
+    local function clampTargetPosition()
+        if not libraryRef then
+            return
+        end
+        local vpWidth = libraryRef._cachedViewportWidth or guiServiceIsCool.AbsoluteWindowSize.X
+        local vpHeight = libraryRef._cachedViewportHeight or guiServiceIsCool.AbsoluteWindowSize.Y
+        local frameWidth = frame.Size.X.Offset
+        local frameHeight = frame.Size.Y.Offset
+
+        local minX = -vpWidth * targetDragPosition.X.Scale
+        local maxX = vpWidth * (1 - targetDragPosition.X.Scale) - frameWidth
+        local minY = -vpHeight * targetDragPosition.Y.Scale
+        local maxY = vpHeight * (1 - targetDragPosition.Y.Scale) - frameHeight
+
+        targetDragPosition = UDim2.new(
+            targetDragPosition.X.Scale,
+            math.clamp(targetDragPosition.X.Offset, minX, maxX),
+            targetDragPosition.Y.Scale,
+            math.clamp(targetDragPosition.Y.Offset, minY, maxY)
+        )
+    end
+
     local function updateTargetPositionYay(input)
         local howMuchDidIMove = input.Position - whereDidIStart
         targetDragPosition = UDim2.new(
@@ -280,6 +302,7 @@ local function makeDraggableCuzWeCan(frame, handle, libraryRef)
             whereWasIBefore.Y.Scale,
             whereWasIBefore.Y.Offset + howMuchDidIMove.Y
         )
+        clampTargetPosition()
     end
     
     local inputBeganConn = handle.InputBegan:Connect(function(input)
@@ -3345,6 +3368,7 @@ function superMegaAwesomeLibrary:CreateUIBecauseWeNeedIt()
     self:_TrackConnection(self.screenGuiYay:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
         self:_RefreshViewportMetrics()
         self:_InvalidateESPPreviewProjection(false)
+        self:_ClampMainFrameToViewport()
     end))
 
     self.backdropDimFrame = makeThingExist("Frame", {
@@ -3663,6 +3687,43 @@ function superMegaAwesomeLibrary:ToggleUI()
     self:_ApplyOpenCloseVisuals(false)
 end
 
+function superMegaAwesomeLibrary:_ClampMainFrameToViewport()
+    if not self.mainFrameYay or not self.mainFrameYay.Parent then
+        return
+    end
+    local vpWidth = self._cachedViewportWidth or guiServiceIsCool.AbsoluteWindowSize.X
+    local vpHeight = self._cachedViewportHeight or guiServiceIsCool.AbsoluteWindowSize.Y
+    local desiredWidth = 830 * mobileScaleFactor
+    local desiredHeight = 530 * mobileScaleFactor
+    local newWidth = math.min(desiredWidth, vpWidth - 24)
+    local newHeight = math.min(desiredHeight, vpHeight - 24)
+    
+    local currentSize = self.mainFrameYay.Size
+    local currentPos = self.mainFrameYay.Position
+    local sizeChanged = false
+    
+    if currentSize.X.Offset > newWidth or currentSize.Y.Offset > newHeight then
+        self.mainFrameYay.Size = UDim2.new(0, newWidth, 0, newHeight)
+        sizeChanged = true
+    end
+    
+    local frameWidth = self.mainFrameYay.Size.X.Offset
+    local frameHeight = self.mainFrameYay.Size.Y.Offset
+    local minX = -vpWidth * currentPos.X.Scale
+    local maxX = vpWidth * (1 - currentPos.X.Scale) - frameWidth
+    local minY = -vpHeight * currentPos.Y.Scale
+    local maxY = vpHeight * (1 - currentPos.Y.Scale) - frameHeight
+    local newX = math.clamp(currentPos.X.Offset, minX, maxX)
+    local newY = math.clamp(currentPos.Y.Offset, minY, maxY)
+    
+    if sizeChanged or math.abs(currentPos.X.Offset - newX) > 1 or math.abs(currentPos.Y.Offset - newY) > 1 then
+        self.mainFrameYay.Position = UDim2.new(currentPos.X.Scale, newX, currentPos.Y.Scale, newY)
+    end
+    
+    self._mainFrameOpenPosition = UDim2.new(0.5, -frameWidth / 2, 0.5, -frameHeight / 2)
+    self._mainFrameClosedPosition = UDim2.new(0.5, -frameWidth / 2, 1.5, 0)
+end
+
 function superMegaAwesomeLibrary:SetToggleButtonVisible(visible)
     self.toggleButtonVisible = visible
     if self.mobileToggleFrame then
@@ -3812,18 +3873,29 @@ function superMegaAwesomeLibrary:_UpdateWatermark(dt)
 end
 
 function superMegaAwesomeLibrary:CreateMainFrameYay()
-    local frameWidth = 830 * mobileScaleFactor
-    local frameHeight = 530 * mobileScaleFactor
+    local vpWidth = self._cachedViewportWidth or guiServiceIsCool.AbsoluteWindowSize.X
+    local vpHeight = self._cachedViewportHeight or guiServiceIsCool.AbsoluteWindowSize.Y
+    
+    local desiredFrameWidth = 830 * mobileScaleFactor
+    local desiredFrameHeight = 530 * mobileScaleFactor
+    local frameWidth = math.min(desiredFrameWidth, vpWidth - 24)
+    local frameHeight = math.min(desiredFrameHeight, vpHeight - 24)
+    
     local headerLeftPadding = 10 * mobileScaleFactor
     local headerAvatarBaseX = 160 * mobileScaleFactor
     local headerAvatarSize = 30 * mobileScaleFactor
     local headerAvatarGap = 10 * mobileScaleFactor
     local searchWidth = 214 * mobileScaleFactor
     local searchRightPadding = 12 * mobileScaleFactor
-    local contentStartX = 198 * mobileScaleFactor
+    
+    local sectionScrollWidth = math.min(162 * mobileScaleFactor, math.max(100 * mobileScaleFactor, frameWidth * 0.22))
+    local minContentStartX = 17 + sectionScrollWidth + 6
+    local desiredContentStartX = 198 * mobileScaleFactor
+    local contentStartX = math.max(minContentStartX, math.min(desiredContentStartX, frameWidth * 0.32))
+    
     local contentRightPadding = 7 * mobileScaleFactor
     local sectionScrollHeight = math.max(260 * mobileScaleFactor, frameHeight - (75 * mobileScaleFactor) - (58 * mobileScaleFactor))
-    local contentHeight = 461 * mobileScaleFactor
+    local contentHeight = math.min(461 * mobileScaleFactor, frameHeight - 62 * mobileScaleFactor - 8)
     self._mainFrameOpenPosition = UDim2.new(0.5, -frameWidth/2, 0.5, -frameHeight/2)
     self._mainFrameClosedPosition = UDim2.new(0.5, -frameWidth/2, 1.5, 0)
     
@@ -3833,6 +3905,7 @@ function superMegaAwesomeLibrary:CreateMainFrameYay()
         Position = self._mainFrameOpenPosition,
         BorderSizePixel = 0,
         Size = UDim2.new(0, frameWidth, 0, frameHeight),
+        ClipsDescendants = true,
         Parent = self.screenGuiYay
     })
     
@@ -3980,7 +4053,7 @@ function superMegaAwesomeLibrary:CreateMainFrameYay()
     
     self.sectionHolderScroll = makeThingExist("ScrollingFrame", {
         BackgroundTransparency = 1, Position = UDim2.new(0, 17, 0, 75 * mobileScaleFactor),
-        Size = UDim2.new(0, 162 * mobileScaleFactor, 0, sectionScrollHeight),
+        Size = UDim2.new(0, sectionScrollWidth, 0, sectionScrollHeight),
         ScrollBarThickness = 0, CanvasSize = UDim2.new(0, 0, 0, 0),
         AutomaticCanvasSize = Enum.AutomaticSize.Y, ClipsDescendants = true, ZIndex = 3, Parent = self.mainFrameYay
     })
@@ -4007,9 +4080,10 @@ function superMegaAwesomeLibrary:CreateMainFrameYay()
         Size = UDim2.new(0, contentWidth, 0, contentHeight),
         ClipsDescendants = true, Parent = self.mainFrameYay
     })
+    self.contentWidth = contentWidth
 
     local settingsPanelWidth = 185 * mobileScaleFactor
-    local settingsPanelHeight = 292 * mobileScaleFactor
+    local settingsPanelHeight = math.min(292 * mobileScaleFactor, frameHeight - 50)
     self.uiSettingsOpen = false
 
     self.uiSettingsButtonFrame = makeThingExist("Frame", {
@@ -4919,24 +4993,44 @@ function superMegaAwesomeLibrary:CreateSection(config)
         })
         --sectionObj.Library:EnableSmoothScrolling(tabObj.contentScroll, 38)
         
+        local contentWidth = sectionObj.Library.contentWidth or (540 * mobileScaleFactor)
+        local twoColumnMinWidth = 540 * mobileScaleFactor
+        local useSingleColumn = contentWidth < twoColumnMinWidth
+        
         tabObj.leftColumnFrame = makeThingExist("Frame", {BackgroundTransparency = 1, Size = UDim2.new(0, 262 * mobileScaleFactor, 0, 1000), Parent = tabObj.contentScroll})
-        tabObj.rightColumnFrame = makeThingExist("Frame", {BackgroundTransparency = 1, Position = UDim2.new(0, 272 * mobileScaleFactor, 0, 0), Size = UDim2.new(0, 262 * mobileScaleFactor, 0, 1000), Parent = tabObj.contentScroll})
+        if useSingleColumn then
+            tabObj.rightColumnFrame = makeThingExist("Frame", {BackgroundTransparency = 1, Position = UDim2.new(0, 0, 0, 0), Size = UDim2.new(0, math.max(140 * mobileScaleFactor, contentWidth - 16), 0, 1000), Parent = tabObj.contentScroll})
+            tabObj.leftColumnFrame.Size = UDim2.new(0, math.max(140 * mobileScaleFactor, contentWidth - 16), 0, 1000)
+        else
+            tabObj.rightColumnFrame = makeThingExist("Frame", {BackgroundTransparency = 1, Position = UDim2.new(0, 272 * mobileScaleFactor, 0, 0), Size = UDim2.new(0, 262 * mobileScaleFactor, 0, 1000), Parent = tabObj.contentScroll})
+        end
         
         local groupSpacingY = 15 * mobileScaleFactor
         local function relayoutGroupsYay()
-            local sideOffsets = {Left = 0, Right = 0}
-            for _, group in ipairs(tabObj.groupsInTab) do
-                if group.mainFrame and group.mainFrame.Parent then
-                    local side = group.side == "Right" and "Right" or "Left"
-                    local nextY = sideOffsets[side]
-                    group.mainFrame.Position = UDim2.new(0, 1, 0, nextY + 1)
-                    sideOffsets[side] = nextY + group.mainFrame.Size.Y.Offset + groupSpacingY
+            if useSingleColumn then
+                local globalYOffset = 0
+                for _, group in ipairs(tabObj.groupsInTab) do
+                    if group.mainFrame and group.mainFrame.Parent then
+                        group.mainFrame.Position = UDim2.new(0, 1, 0, globalYOffset + 1)
+                        globalYOffset = globalYOffset + group.mainFrame.Size.Y.Offset + groupSpacingY
+                    end
                 end
+                tabObj.contentScroll.CanvasSize = UDim2.new(0, math.max(0, contentWidth - 8), 0, globalYOffset)
+            else
+                local sideOffsets = {Left = 0, Right = 0}
+                for _, group in ipairs(tabObj.groupsInTab) do
+                    if group.mainFrame and group.mainFrame.Parent then
+                        local side = group.side == "Right" and "Right" or "Left"
+                        local nextY = sideOffsets[side]
+                        group.mainFrame.Position = UDim2.new(0, 1, 0, nextY + 1)
+                        sideOffsets[side] = nextY + group.mainFrame.Size.Y.Offset + groupSpacingY
+                    end
+                end
+                tabObj.groupPositions.Left = sideOffsets.Left
+                tabObj.groupPositions.Right = sideOffsets.Right
+                local maxHeight = math.max(sideOffsets.Left, sideOffsets.Right)
+                tabObj.contentScroll.CanvasSize = UDim2.new(0, 540 * mobileScaleFactor, 0, maxHeight)
             end
-            tabObj.groupPositions.Left = sideOffsets.Left
-            tabObj.groupPositions.Right = sideOffsets.Right
-            local maxHeight = math.max(sideOffsets.Left, sideOffsets.Right)
-            tabObj.contentScroll.CanvasSize = UDim2.new(0, 540 * mobileScaleFactor, 0, maxHeight)
         end
         
         function tabObj:Activate()
@@ -5032,7 +5126,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
             end
             
             local parentColumn = groupObj.side == "Left" and tabObj.leftColumnFrame or tabObj.rightColumnFrame
-            local groupWidth = 262 * mobileScaleFactor
+            local groupWidth = useSingleColumn and math.min(262 * mobileScaleFactor, math.max(140 * mobileScaleFactor, contentWidth - 16)) or (262 * mobileScaleFactor)
             
             groupObj.mainFrame = makeFlowUISurfaceFrame(
                 parentColumn,
