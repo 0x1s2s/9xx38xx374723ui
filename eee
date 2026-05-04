@@ -3399,7 +3399,6 @@ function superMegaAwesomeLibrary:CreateUIBecauseWeNeedIt()
         Parent = self.screenGuiYay
     })
     
-    self:CreateWatermarkBecauseWeCool()
     self:CreateMainFrameYay()
     if self._uiVisualSettings.ESPSelfPreview then
         self:_CreateESPPreviewPanel()
@@ -3736,21 +3735,24 @@ function superMegaAwesomeLibrary:SetToggleKey(keyCode)
 end
 
 function superMegaAwesomeLibrary:CreateMobileToggleButton()
-    local toggleScale = isMobileUserSadly and 1 or mobileScaleFactor
-    local buttonSize = 48 * toggleScale
+    local barHeight = 38
+    local initialText = self.config.Name .. " | 00:00:00 | 60 FPS"
+    local textWidth = howWideIsThisText(initialText, 14, Enum.Font.GothamSemibold)
+    local vpWidth = self._cachedViewportWidth or guiServiceIsCool.AbsoluteWindowSize.X
+    local barWidth = math.min(textWidth + 56, math.max(180, vpWidth - 24))
     
     self.mobileToggleFrame, self.mobileToggleStroke = makeFlowUISurfaceFrame(
         self.screenGuiYay,
         flowUIPalette.Surface,
-        UDim2.new(0.5, 0, 0, 8 * toggleScale),
-        UDim2.new(0, buttonSize, 0, buttonSize),
+        UDim2.new(0.5, 0, 0, 8),
+        UDim2.new(0, barWidth, 0, barHeight),
         {
-            CornerRadius = UDim.new(0, 14 * toggleScale),
+            CornerRadius = UDim.new(0, 10),
             StrokeColor = flowUIPalette.Stroke,
             StrokeGradient = true
         }
     )
-    self.mobileToggleFrame.Name = "MobileToggleButton"
+    self.mobileToggleFrame.Name = "MobileToggleBar"
     self.mobileToggleFrame.AnchorPoint = Vector2.new(0.5, 0)
     
     self.mobileToggleGlow = makeThingExist("ImageLabel", {
@@ -3766,17 +3768,38 @@ function superMegaAwesomeLibrary:CreateMobileToggleButton()
         Parent = self.mobileToggleFrame
     })
     
-    self.mobileToggleIcon = makeThingExist("ImageLabel", {
+    makeThingExist("ImageLabel", {
+        Image = flowUIBrandIconUrl,
         BackgroundTransparency = 1,
-        Image = "rbxassetid://95109736896642",
-        ImageColor3 = self.config.AccentColor,
-        Position = UDim2.new(0.5, 0, 0.5, 0),
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        Size = UDim2.new(0, 31 * toggleScale, 0, 31 * toggleScale),
-        ZIndex = 1,
+        Position = UDim2.new(0, 10, 0.5, -9),
+        Size = UDim2.new(0, 18, 0, 18),
         Parent = self.mobileToggleFrame
     })
     
+    self.mobileToggleBarTextLabel = makeThingExist("TextLabel", {
+        FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
+        TextColor3 = Color3.new(1, 1, 1),
+        Text = initialText,
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0, 34, 0, 0),
+        TextSize = 14,
+        Size = UDim2.new(1, -58, 1, 0),
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextTruncate = Enum.TextTruncate.AtEnd,
+        Parent = self.mobileToggleFrame
+    })
+    table.insert(self._gradientLabels, self.mobileToggleBarTextLabel)
+    
+    makeThingExist("ImageLabel", {
+        Image = "rbxassetid://111626678408582",
+        BackgroundTransparency = 1,
+        ImageColor3 = flowUIPalette.TextMuted,
+        Position = UDim2.new(1, -20, 0.5, -6),
+        Size = UDim2.new(0, 12, 0, 12),
+        Parent = self.mobileToggleFrame
+    })
+    
+    self.mobileToggleIcon = nil
     self.mobileToggleStateLabel = nil
     self.mobileToggleStateDot = nil
     self.mobileToggleAvatarFrame = nil
@@ -3793,9 +3816,9 @@ function superMegaAwesomeLibrary:CreateMobileToggleButton()
     
     mobileToggleBtn.MouseButton1Click:Connect(function()
         self:ToggleUI()
-        smoothMoveGoWoosh(self.mobileToggleFrame, {Size = UDim2.new(0, buttonSize - (4 * mobileScaleFactor), 0, buttonSize - (4 * mobileScaleFactor))}, 0.08)
+        smoothMoveGoWoosh(self.mobileToggleFrame, {Size = UDim2.new(0, barWidth - 6, 0, barHeight - 4)}, 0.08)
         task.delay(0.1, function()
-            smoothMoveGoWoosh(self.mobileToggleFrame, {Size = UDim2.new(0, buttonSize, 0, buttonSize)}, 0.16, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+            smoothMoveGoWoosh(self.mobileToggleFrame, {Size = UDim2.new(0, barWidth, 0, barHeight)}, 0.16, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
         end)
     end)
     
@@ -3848,7 +3871,10 @@ function superMegaAwesomeLibrary:CreateWatermarkBecauseWeCool()
 end
 
 function superMegaAwesomeLibrary:_UpdateWatermark(dt)
-    if not (self.watermarkFrame and self.watermarkFrame.Parent and self.watermarkTextLabel and self.watermarkTextLabel.Parent) then
+    local hasWatermark = self.watermarkFrame and self.watermarkFrame.Parent and self.watermarkTextLabel and self.watermarkTextLabel.Parent
+    local hasMobileBar = self.mobileToggleFrame and self.mobileToggleFrame.Parent and self.mobileToggleBarTextLabel and self.mobileToggleBarTextLabel.Parent
+    
+    if not hasWatermark and not hasMobileBar then
         return
     end
 
@@ -3861,14 +3887,30 @@ function superMegaAwesomeLibrary:_UpdateWatermark(dt)
     local timeNow = os.date("%H:%M:%S")
     local fpsCount = self._latestFPSValue > 0 and self._latestFPSValue or 0
     local newText = self.config.Name .. " | " .. timeNow .. " | " .. fpsCount .. " FPS"
-    if self.watermarkTextLabel.Text ~= newText then
-        self.watermarkTextLabel.Text = newText
+    
+    if hasWatermark then
+        if self.watermarkTextLabel.Text ~= newText then
+            self.watermarkTextLabel.Text = newText
+        end
+        local newWidth = howWideIsThisText(newText, 14 * mobileScaleFactor, Enum.Font.GothamSemibold) + 45
+        if math.abs(newWidth - (self._watermarkLastWidth or 0)) > 1 then
+            self._watermarkLastWidth = newWidth
+            smoothMoveGoWoosh(self.watermarkFrame, {Size = UDim2.new(0, newWidth, 0, 36 * mobileScaleFactor)}, 0.18)
+        end
     end
-
-    local newWidth = howWideIsThisText(newText, 14 * mobileScaleFactor, Enum.Font.GothamSemibold) + 45
-    if math.abs(newWidth - (self._watermarkLastWidth or 0)) > 1 then
-        self._watermarkLastWidth = newWidth
-        smoothMoveGoWoosh(self.watermarkFrame, {Size = UDim2.new(0, newWidth, 0, 36 * mobileScaleFactor)}, 0.18)
+    
+    if hasMobileBar then
+        if self.mobileToggleBarTextLabel.Text ~= newText then
+            self.mobileToggleBarTextLabel.Text = newText
+        end
+        local textWidth = howWideIsThisText(newText, 14, Enum.Font.GothamSemibold)
+        local desiredWidth = textWidth + 56
+        local vpWidth = self._cachedViewportWidth or guiServiceIsCool.AbsoluteWindowSize.X
+        local cappedWidth = math.min(desiredWidth, math.max(180, vpWidth - 24))
+        if math.abs(cappedWidth - (self._mobileBarLastWidth or 0)) > 1 then
+            self._mobileBarLastWidth = cappedWidth
+            smoothMoveGoWoosh(self.mobileToggleFrame, {Size = UDim2.new(0, cappedWidth, 0, 38)}, 0.18)
+        end
     end
 end
 
