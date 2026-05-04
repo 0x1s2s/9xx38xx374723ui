@@ -3769,7 +3769,7 @@ function superMegaAwesomeLibrary:CreateMobileToggleButton()
     })
     
     makeThingExist("ImageLabel", {
-        Image = flowUIBrandIconUrl,
+        Image = "rbxassetid://95109736896642",
         BackgroundTransparency = 1,
         Position = UDim2.new(0, 10, 0.5, -9),
         Size = UDim2.new(0, 18, 0, 18),
