@@ -5192,17 +5192,23 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     }
                 )
                 
+                local toggleW = (isMobileUserSadly and 48 or 36) * mobileScaleFactor
+                local toggleH = (isMobileUserSadly and 26 or 22) * mobileScaleFactor
+                local knobSize = (isMobileUserSadly and 20 or 16) * mobileScaleFactor
+                local knobOffPos = UDim2.new(0, 2, 0, (toggleH - knobSize) / 2)
+                local knobOnPos = UDim2.new(0, toggleW - knobSize - 2, 0, (toggleH - knobSize) / 2)
+
                 toggleObj.switchFrame = makeThingExist("Frame", {
                     BackgroundColor3 = toggleObj.value and groupObj.Library.config.AccentColor or flowUIPalette.ToggleOff,
-                    Position = UDim2.new(1, -44 * mobileScaleFactor, 0, yPosition),
-                    Size = UDim2.new(0, 36 * mobileScaleFactor, 0, 22 * mobileScaleFactor), Parent = groupObj.mainFrame
+                    Position = UDim2.new(1, -(toggleW + 8), 0, yPosition),
+                    Size = UDim2.new(0, toggleW, 0, toggleH), Parent = groupObj.mainFrame
                 })
                 makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = toggleObj.switchFrame})
                 
                 toggleObj.circleFrame = makeThingExist("Frame", {
                     BackgroundColor3 = toggleObj.value and Color3.new(1, 1, 1) or flowUIPalette.ToggleKnobOff,
-                    Position = toggleObj.value and UDim2.new(0.462, 0, 0.143, 0) or UDim2.new(0.0104, 0, 0.143, 0),
-                    Size = UDim2.new(0, 16 * mobileScaleFactor, 0, 16 * mobileScaleFactor), Parent = toggleObj.switchFrame
+                    Position = toggleObj.value and knobOnPos or knobOffPos,
+                    Size = UDim2.new(0, knobSize, 0, knobSize), Parent = toggleObj.switchFrame
                 })
                 makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = toggleObj.circleFrame})
                 
@@ -5212,10 +5218,10 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     toggleObj.value = value == true
                     if toggleObj.value then
                         smoothMoveGoWoosh(toggleObj.switchFrame, {BackgroundColor3 = groupObj.Library.config.AccentColor}, 0.2)
-                        smoothMoveGoWoosh(toggleObj.circleFrame, {Position = UDim2.new(0.462, 0, 0.143, 0), BackgroundColor3 = Color3.new(1, 1, 1)}, 0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+                        smoothMoveGoWoosh(toggleObj.circleFrame, {Position = knobOnPos, BackgroundColor3 = Color3.new(1, 1, 1)}, 0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
                     else
                         smoothMoveGoWoosh(toggleObj.switchFrame, {BackgroundColor3 = flowUIPalette.ToggleOff}, 0.2)
-                        smoothMoveGoWoosh(toggleObj.circleFrame, {Position = UDim2.new(0.0104, 0, 0.143, 0), BackgroundColor3 = flowUIPalette.ToggleKnobOff}, 0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+                        smoothMoveGoWoosh(toggleObj.circleFrame, {Position = knobOffPos, BackgroundColor3 = flowUIPalette.ToggleKnobOff}, 0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
                     end
                     if not silent then
                         toggleConfig.Callback(toggleObj.value)
@@ -5282,10 +5288,10 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 local yPosition = groupObj.elementYPos
                 local sliderWidth = 240 * mobileScaleFactor
                 local valueLabelWidth = 72 * mobileScaleFactor
-                local sliderHitHeight = 20 * mobileScaleFactor
+                local sliderHitHeight = (isMobileUserSadly and 28 or 20) * mobileScaleFactor
                 local sliderTrackHeight = 8 * mobileScaleFactor
-                local sliderKnobWidth = 9 * mobileScaleFactor
-                local sliderKnobHeight = 18 * mobileScaleFactor
+                local sliderKnobWidth = (isMobileUserSadly and 12 or 9) * mobileScaleFactor
+                local sliderKnobHeight = (isMobileUserSadly and 24 or 18) * mobileScaleFactor
                 local sliderKnobHalfWidth = sliderKnobWidth * 0.5
                 
                 sliderObj.labelText = makeFlowUILabel(
@@ -5446,7 +5452,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     groupObj.mainFrame,
                     buttonObj.isLocked and flowUIPalette.SurfaceAlt or flowUIPalette.Button,
                     UDim2.new(0, 10, 0, yPosition),
-                    UDim2.new(0, buttonWidth, 0, 28 * mobileScaleFactor),
+                    UDim2.new(0, buttonWidth, 0, (isMobileUserSadly and 32 or 28) * mobileScaleFactor),
                     {
                         CornerRadius = UDim.new(0, 6),
                         StrokeColor = buttonObj.isLocked and flowUIPalette.Stroke or flowUIPalette.StrokeStrong,
@@ -5531,9 +5537,10 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 local keyText = getKeyText()
                 local keyWidth = math.max(48 * mobileScaleFactor, howWideIsThisText(keyText, 12 * mobileScaleFactor) + 30 * mobileScaleFactor)
                 
+                local keybindBtnHeight = (isMobileUserSadly and 28 or 22) * mobileScaleFactor
                 keybindObj.buttonFrame = makeThingExist("Frame", {
                     BackgroundColor3 = Color3.fromRGB(32, 32, 32), Position = UDim2.new(1, -keyWidth - 10, 0, yPosition),
-                    Size = UDim2.new(0, keyWidth, 0, 22 * mobileScaleFactor), Active = true, Parent = groupObj.mainFrame
+                    Size = UDim2.new(0, keyWidth, 0, keybindBtnHeight), Active = true, Parent = groupObj.mainFrame
                 })
                 makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = keybindObj.buttonFrame})
                 
@@ -5590,10 +5597,10 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     Parent = keybindObj.modeMenuFrame
                 })
                 
-                local toggleModeFrame = makeThingExist("Frame", {
+                local                 toggleModeFrame = makeThingExist("Frame", {
                     BackgroundColor3 = Color3.fromRGB(28, 28, 28),
                     Position = UDim2.new(0, 8, 0, 26 * mobileScaleFactor),
-                    Size = UDim2.new(1, -16, 0, 20 * mobileScaleFactor),
+                    Size = UDim2.new(1, -16, 0, (isMobileUserSadly and 26 or 20) * mobileScaleFactor),
                     ZIndex = 10000,
                     Parent = keybindObj.modeMenuFrame
                 })
@@ -5610,10 +5617,10 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     Parent = toggleModeFrame
                 })
                 
-                local holdModeFrame = makeThingExist("Frame", {
+                local                 holdModeFrame = makeThingExist("Frame", {
                     BackgroundColor3 = Color3.fromRGB(28, 28, 28),
-                    Position = UDim2.new(0, 8, 0, 50 * mobileScaleFactor),
-                    Size = UDim2.new(1, -16, 0, 20 * mobileScaleFactor),
+                    Position = UDim2.new(0, 8, 0, (isMobileUserSadly and 58 or 50) * mobileScaleFactor),
+                    Size = UDim2.new(1, -16, 0, (isMobileUserSadly and 26 or 20) * mobileScaleFactor),
                     ZIndex = 10000,
                     Parent = keybindObj.modeMenuFrame
                 })
@@ -5648,7 +5655,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 
                 local function updateKeybindSizeYay(text)
                     local newWidth = math.max(48 * mobileScaleFactor, howWideIsThisText(text, 12 * mobileScaleFactor) + 30 * mobileScaleFactor)
-                    smoothMoveGoWoosh(keybindObj.buttonFrame, {Size = UDim2.new(0, newWidth, 0, 22 * mobileScaleFactor), Position = UDim2.new(1, -newWidth - 10, 0, yPosition)}, 0.15)
+                    smoothMoveGoWoosh(keybindObj.buttonFrame, {Size = UDim2.new(0, newWidth, 0, keybindBtnHeight), Position = UDim2.new(1, -newWidth - 10, 0, yPosition)}, 0.15)
                 end
                 
                 local function updateModeVisuals()
@@ -5945,9 +5952,10 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 local keyText = keybindToggleObj.keyValue == Enum.KeyCode.Unknown and "None" or keybindToggleObj.keyValue.Name
                 local keyWidth = math.max(48 * mobileScaleFactor, howWideIsThisText(keyText, 12 * mobileScaleFactor) + 30 * mobileScaleFactor)
                 
+                local kbtBtnHeight = (isMobileUserSadly and 28 or 22) * mobileScaleFactor
                 keybindToggleObj.keybindButtonFrame = makeThingExist("Frame", {
                     BackgroundColor3 = Color3.fromRGB(32, 32, 32), Position = UDim2.new(1, -keyWidth - 10, 0, yPosition),
-                    Size = UDim2.new(0, keyWidth, 0, 22 * mobileScaleFactor), Parent = groupObj.mainFrame
+                    Size = UDim2.new(0, keyWidth, 0, kbtBtnHeight), Parent = groupObj.mainFrame
                 })
                 makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = keybindToggleObj.keybindButtonFrame})
                 
@@ -5967,17 +5975,23 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     Size = UDim2.new(0, 15 * mobileScaleFactor, 0, 15 * mobileScaleFactor), Parent = keybindToggleObj.keybindButtonFrame
                 })
                 
+                local kbtToggleW = (isMobileUserSadly and 48 or 36) * mobileScaleFactor
+                local kbtToggleH = (isMobileUserSadly and 26 or 22) * mobileScaleFactor
+                local kbtKnobSize = (isMobileUserSadly and 20 or 16) * mobileScaleFactor
+                local kbtKnobOff = UDim2.new(0, 2, 0, (kbtToggleH - kbtKnobSize) / 2)
+                local kbtKnobOn = UDim2.new(0, kbtToggleW - kbtKnobSize - 2, 0, (kbtToggleH - kbtKnobSize) / 2)
+
                 keybindToggleObj.toggleSwitchFrame = makeThingExist("Frame", {
                     BackgroundColor3 = keybindToggleObj.toggleValue and groupObj.Library.config.AccentColor or Color3.fromRGB(32, 32, 32),
-                    Position = UDim2.new(1, -keyWidth - 48 * mobileScaleFactor, 0, yPosition),
-                    Size = UDim2.new(0, 36 * mobileScaleFactor, 0, 22 * mobileScaleFactor), Parent = groupObj.mainFrame
+                    Position = UDim2.new(1, -keyWidth - (kbtToggleW + 12), 0, yPosition),
+                    Size = UDim2.new(0, kbtToggleW, 0, kbtToggleH), Parent = groupObj.mainFrame
                 })
                 makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = keybindToggleObj.toggleSwitchFrame})
                 
                 keybindToggleObj.toggleCircleFrame = makeThingExist("Frame", {
                     BackgroundColor3 = keybindToggleObj.toggleValue and Color3.new(1, 1, 1) or Color3.fromRGB(75, 75, 75),
-                    Position = keybindToggleObj.toggleValue and UDim2.new(0.462, 0, 0.143, 0) or UDim2.new(0.0104, 0, 0.143, 0),
-                    Size = UDim2.new(0, 16 * mobileScaleFactor, 0, 16 * mobileScaleFactor), Parent = keybindToggleObj.toggleSwitchFrame
+                    Position = keybindToggleObj.toggleValue and kbtKnobOn or kbtKnobOff,
+                    Size = UDim2.new(0, kbtKnobSize, 0, kbtKnobSize), Parent = keybindToggleObj.toggleSwitchFrame
                 })
                 makeThingExist("UICorner", {CornerRadius = UDim.new(1, 0), Parent = keybindToggleObj.toggleCircleFrame})
                 
@@ -5988,10 +6002,10 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     keybindToggleObj.toggleValue = value == true
                     if value then
                         smoothMoveGoWoosh(keybindToggleObj.toggleSwitchFrame, {BackgroundColor3 = groupObj.Library.config.AccentColor}, 0.2)
-                        smoothMoveGoWoosh(keybindToggleObj.toggleCircleFrame, {Position = UDim2.new(0.462, 0, 0.143, 0), BackgroundColor3 = Color3.new(1, 1, 1)}, 0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+                        smoothMoveGoWoosh(keybindToggleObj.toggleCircleFrame, {Position = kbtKnobOn, BackgroundColor3 = Color3.new(1, 1, 1)}, 0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
                     else
                         smoothMoveGoWoosh(keybindToggleObj.toggleSwitchFrame, {BackgroundColor3 = Color3.fromRGB(32, 32, 32)}, 0.2)
-                        smoothMoveGoWoosh(keybindToggleObj.toggleCircleFrame, {Position = UDim2.new(0.0104, 0, 0.143, 0), BackgroundColor3 = Color3.fromRGB(75, 75, 75)}, 0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+                        smoothMoveGoWoosh(keybindToggleObj.toggleCircleFrame, {Position = kbtKnobOff, BackgroundColor3 = Color3.fromRGB(75, 75, 75)}, 0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
                     end
                     if not silent then
                         keybindToggleConfig.ToggleCallback(keybindToggleObj.toggleValue)
@@ -6000,8 +6014,8 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 
                 local function updateKeybindSizeYay(text)
                     local newWidth = math.max(48 * mobileScaleFactor, howWideIsThisText(text, 12 * mobileScaleFactor) + 30 * mobileScaleFactor)
-                    smoothMoveGoWoosh(keybindToggleObj.keybindButtonFrame, {Size = UDim2.new(0, newWidth, 0, 22 * mobileScaleFactor), Position = UDim2.new(1, -newWidth - 10, 0, yPosition)}, 0.15)
-                    smoothMoveGoWoosh(keybindToggleObj.toggleSwitchFrame, {Position = UDim2.new(1, -newWidth - 48 * mobileScaleFactor, 0, yPosition)}, 0.15)
+                    smoothMoveGoWoosh(keybindToggleObj.keybindButtonFrame, {Size = UDim2.new(0, newWidth, 0, kbtBtnHeight), Position = UDim2.new(1, -newWidth - 10, 0, yPosition)}, 0.15)
+                    smoothMoveGoWoosh(keybindToggleObj.toggleSwitchFrame, {Position = UDim2.new(1, -newWidth - (kbtToggleW + 12), 0, yPosition)}, 0.15)
                 end
                 
                 function keybindToggleObj:SetKey(key, silent)
@@ -6119,12 +6133,13 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 
                 local displayText = tostring(dropdownObj.value or "None")
                 local buttonWidth = math.clamp(howWideIsThisText(displayText, 12 * mobileScaleFactor) + 30 * mobileScaleFactor, 84 * mobileScaleFactor, 112 * mobileScaleFactor)
+                local ddBtnHeight = (isMobileUserSadly and 28 or 23) * mobileScaleFactor
                 
                 dropdownObj.buttonFrame, dropdownObj.strokeThing = makeFlowUISurfaceFrame(
                     groupObj.mainFrame,
                     flowUIPalette.Button,
                     UDim2.new(1, -buttonWidth - 10, 0, yPosition),
-                    UDim2.new(0, buttonWidth, 0, 23 * mobileScaleFactor),
+                    UDim2.new(0, buttonWidth, 0, ddBtnHeight),
                     {
                         CornerRadius = UDim.new(1, 0),
                         StrokeColor = flowUIPalette.Stroke
@@ -6267,9 +6282,10 @@ function superMegaAwesomeLibrary:CreateSection(config)
                             TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd,
                             ZIndex = 10001, Parent = dropdownObj.optionContainerFrame
                         })
+                        local optionRowH = (isMobileUserSadly and 26 or 20) * mobileScaleFactor
                         local optionClickButton = makeThingExist("TextButton", {
                             Text = "", BackgroundTransparency = 1, Position = UDim2.new(0, 0, 0, optY),
-                            Size = UDim2.new(1, 0, 0, 20 * mobileScaleFactor), ZIndex = 10002, Parent = dropdownObj.optionContainerFrame
+                            Size = UDim2.new(1, 0, 0, optionRowH), ZIndex = 10002, Parent = dropdownObj.optionContainerFrame
                         })
                         optionClickButton.MouseButton1Click:Connect(function()
                             dropdownObj.value = option
@@ -6277,13 +6293,13 @@ function superMegaAwesomeLibrary:CreateSection(config)
                             local optionText = tostring(option)
                             dropdownObj.selectedLabelText.Text = optionText
                             local newWidth = math.clamp(howWideIsThisText(optionText, 12 * mobileScaleFactor) + 30 * mobileScaleFactor, 84 * mobileScaleFactor, 112 * mobileScaleFactor)
-                            smoothMoveGoWoosh(dropdownObj.buttonFrame, {Size = UDim2.new(0, newWidth, 0, 21 * mobileScaleFactor), Position = UDim2.new(1, -newWidth - 10, 0, yPosition)}, 0.15)
+                            smoothMoveGoWoosh(dropdownObj.buttonFrame, {Size = UDim2.new(0, newWidth, 0, ddBtnHeight), Position = UDim2.new(1, -newWidth - 10, 0, yPosition)}, 0.15)
                             createOptionsYay()
                             dropdownConfig.Callback(option)
                         end)
                         optionClickButton.MouseEnter:Connect(function() if dropdownObj.value ~= option then smoothMoveGoWoosh(optionLabelText, {TextColor3 = flowUIPalette.TextMuted}, 0.2) end end)
                         optionClickButton.MouseLeave:Connect(function() if dropdownObj.value ~= option then smoothMoveGoWoosh(optionLabelText, {TextColor3 = groupObj.Library.config.SubTextColor or flowUIPalette.TextMuted}, 0.2) end end)
-                        optY = optY + 22 * mobileScaleFactor
+                        optY = optY + (isMobileUserSadly and 30 or 22) * mobileScaleFactor
                     end
                     dropdownObj.optionContainerFrame.Size = UDim2.new(1, -6, 0, optY)
                     dropdownObj.optionScrollFrame.CanvasSize = UDim2.new(0, 0, 0, optY)
@@ -6309,7 +6325,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 dropdownClickButton.MouseButton1Click:Connect(function()
                     dropdownObj.isOpen = not dropdownObj.isOpen
                     if dropdownObj.isOpen then
-                        local contentHeight = (35 + (#dropdownConfig.Options * 22)) * mobileScaleFactor
+                        local contentHeight = (35 + (#dropdownConfig.Options * (isMobileUserSadly and 30 or 22))) * mobileScaleFactor
                         local height = math.min(contentHeight, maxDropdownHeight)
                         updateDropdownPositionYay(height)
                         dropdownObj.optionHolderFrame.Visible = true
@@ -6343,7 +6359,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     local displayValue = tostring(value)
                     dropdownObj.selectedLabelText.Text = displayValue
                     local newWidth = math.clamp(howWideIsThisText(displayValue, 12 * mobileScaleFactor) + 30 * mobileScaleFactor, 84 * mobileScaleFactor, 112 * mobileScaleFactor)
-                    dropdownObj.buttonFrame.Size = UDim2.new(0, newWidth, 0, 21 * mobileScaleFactor)
+                    dropdownObj.buttonFrame.Size = UDim2.new(0, newWidth, 0, ddBtnHeight)
                     dropdownObj.buttonFrame.Position = UDim2.new(1, -newWidth - 10, 0, yPosition)
                     createOptionsYay()
                     if not silent then
@@ -6371,7 +6387,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     local displayValue = tostring(dropdownObj.value or "None")
                     dropdownObj.selectedLabelText.Text = displayValue
                     local newWidth = math.clamp(howWideIsThisText(displayValue, 12 * mobileScaleFactor) + 30 * mobileScaleFactor, 84 * mobileScaleFactor, 112 * mobileScaleFactor)
-                    dropdownObj.buttonFrame.Size = UDim2.new(0, newWidth, 0, 21 * mobileScaleFactor)
+                    dropdownObj.buttonFrame.Size = UDim2.new(0, newWidth, 0, ddBtnHeight)
                     dropdownObj.buttonFrame.Position = UDim2.new(1, -newWidth - 10, 0, yPosition)
                     createOptionsYay()
                     if groupObj.Library._searchQuery ~= "" then
@@ -6496,11 +6512,12 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 local displayText = getDisplayText()
                 local buttonWidth = math.clamp(howWideIsThisText(displayText, 12 * mobileScaleFactor) + 35 * mobileScaleFactor, 92 * mobileScaleFactor, 122 * mobileScaleFactor)
                 
+                local mddBtnHeight = (isMobileUserSadly and 28 or 21) * mobileScaleFactor
                 multiDropdownObj.buttonFrame, multiDropdownObj.strokeThing = makeFlowUISurfaceFrame(
                     groupObj.mainFrame,
                     flowUIPalette.Button,
                     UDim2.new(1, -buttonWidth - 10, 0, yPosition),
-                    UDim2.new(0, buttonWidth, 0, 21 * mobileScaleFactor),
+                    UDim2.new(0, buttonWidth, 0, mddBtnHeight),
                     {
                         CornerRadius = UDim.new(1, 0),
                         StrokeColor = flowUIPalette.Stroke
@@ -6636,16 +6653,18 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     for _, option in ipairs(multiDropdownConfig.Options) do
                         local isSelected = multiDropdownObj.selectedValues[option] == true
                         
+                        local mddRowH = (isMobileUserSadly and 28 or 22) * mobileScaleFactor
+                        local mddCheckSize = (isMobileUserSadly and 20 or 16) * mobileScaleFactor
                         local optionFrame = makeThingExist("Frame", {
                             BackgroundTransparency = 1, Position = UDim2.new(0, 0, 0, optY),
-                            Size = UDim2.new(1, 0, 0, 22 * mobileScaleFactor), ZIndex = 10001,
+                            Size = UDim2.new(1, 0, 0, mddRowH), ZIndex = 10001,
                             Parent = multiDropdownObj.optionContainerFrame
                         })
                         
                         local checkboxFrame = makeThingExist("Frame", {
                             BackgroundColor3 = isSelected and groupObj.Library.config.AccentColor or flowUIPalette.Button,
-                            Position = UDim2.new(0, 12, 0.5, -8 * mobileScaleFactor),
-                            Size = UDim2.new(0, 16 * mobileScaleFactor, 0, 16 * mobileScaleFactor),
+                            Position = UDim2.new(0, 12, 0.5, -mddCheckSize / 2),
+                            Size = UDim2.new(0, mddCheckSize, 0, mddCheckSize),
                             ZIndex = 10002, Parent = optionFrame
                         })
                         makeThingExist("UICorner", {CornerRadius = UDim.new(0, 4), Parent = checkboxFrame})
@@ -6654,7 +6673,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                             Image = "rbxassetid://10709790644", ImageColor3 = Color3.new(1, 1, 1),
                             ImageTransparency = isSelected and 0 or 1, BackgroundTransparency = 1,
                             Position = UDim2.new(0.5, 0, 0.5, 0), AnchorPoint = Vector2.new(0.5, 0.5),
-                            Size = UDim2.new(0, 12 * mobileScaleFactor, 0, 12 * mobileScaleFactor),
+                            Size = UDim2.new(0, (isMobileUserSadly and 16 or 12) * mobileScaleFactor, 0, (isMobileUserSadly and 16 or 12) * mobileScaleFactor),
                             ZIndex = 10003, Parent = checkboxFrame
                         })
                         
@@ -6687,7 +6706,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                             local newDisplayText = getDisplayText()
                             multiDropdownObj.selectedLabelText.Text = newDisplayText
                             local newWidth = math.clamp(howWideIsThisText(newDisplayText, 12 * mobileScaleFactor) + 35 * mobileScaleFactor, 92 * mobileScaleFactor, 122 * mobileScaleFactor)
-                            smoothMoveGoWoosh(multiDropdownObj.buttonFrame, {Size = UDim2.new(0, newWidth, 0, 21 * mobileScaleFactor), Position = UDim2.new(1, -newWidth - 10, 0, yPosition)}, 0.15)
+                            smoothMoveGoWoosh(multiDropdownObj.buttonFrame, {Size = UDim2.new(0, newWidth, 0, mddBtnHeight), Position = UDim2.new(1, -newWidth - 10, 0, yPosition)}, 0.15)
                             
                             multiDropdownConfig.Callback(getSelectedArray())
                         end)
@@ -6705,7 +6724,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                             end
                         end)
                         
-                        optY = optY + 24 * mobileScaleFactor
+                        optY = optY + (isMobileUserSadly and 32 or 24) * mobileScaleFactor
                     end
                     multiDropdownObj.optionContainerFrame.Size = UDim2.new(1, -6, 0, optY)
                     multiDropdownObj.optionScrollFrame.CanvasSize = UDim2.new(0, 0, 0, optY)
@@ -6731,7 +6750,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                 dropdownClickButton.MouseButton1Click:Connect(function()
                     multiDropdownObj.isOpen = not multiDropdownObj.isOpen
                     if multiDropdownObj.isOpen then
-                        local contentHeight = (38 + (#multiDropdownConfig.Options * 24)) * mobileScaleFactor
+                        local contentHeight = (38 + (#multiDropdownConfig.Options * (isMobileUserSadly and 32 or 24))) * mobileScaleFactor
                         local height = math.min(contentHeight, maxMultiDropdownHeight)
                         updateDropdownPositionYay(height)
                         multiDropdownObj.optionHolderFrame.Visible = true
@@ -6772,7 +6791,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     local newDisplayText = getDisplayText()
                     multiDropdownObj.selectedLabelText.Text = newDisplayText
                     local newWidth = math.clamp(howWideIsThisText(newDisplayText, 12 * mobileScaleFactor) + 35 * mobileScaleFactor, 92 * mobileScaleFactor, 122 * mobileScaleFactor)
-                    multiDropdownObj.buttonFrame.Size = UDim2.new(0, newWidth, 0, 21 * mobileScaleFactor)
+                    multiDropdownObj.buttonFrame.Size = UDim2.new(0, newWidth, 0, mddBtnHeight)
                     multiDropdownObj.buttonFrame.Position = UDim2.new(1, -newWidth - 10, 0, yPosition)
                     createMultiOptionsYay()
                     if not silent then
@@ -6800,7 +6819,7 @@ function superMegaAwesomeLibrary:CreateSection(config)
                     local newDisplayText = getDisplayText()
                     multiDropdownObj.selectedLabelText.Text = newDisplayText
                     local newWidth = math.clamp(howWideIsThisText(newDisplayText, 12 * mobileScaleFactor) + 35 * mobileScaleFactor, 92 * mobileScaleFactor, 122 * mobileScaleFactor)
-                    multiDropdownObj.buttonFrame.Size = UDim2.new(0, newWidth, 0, 21 * mobileScaleFactor)
+                    multiDropdownObj.buttonFrame.Size = UDim2.new(0, newWidth, 0, mddBtnHeight)
                     multiDropdownObj.buttonFrame.Position = UDim2.new(1, -newWidth - 10, 0, yPosition)
                     createMultiOptionsYay()
                     if groupObj.Library._searchQuery ~= "" then
